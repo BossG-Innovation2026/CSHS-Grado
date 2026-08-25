@@ -5,24 +5,29 @@
 
 import { execSync } from 'child_process';
 import { readFileSync } from 'fs';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const envPath = resolve(__dirname, '..', '.env.local');
+const envContent = readFileSync(envPath, 'utf8');
+for (const line of envContent.split('\n')) {
+  const [key, ...val] = line.split('=');
+  if (key && val.length) process.env[key.trim()] = val.join('=').trim();
+}
 
 const commitMsg = process.argv[2] || 'auto deploy';
 
 try {
-  // Add all changes
   execSync('git add .', { stdio: 'inherit' });
-
-  // Commit
   execSync(`git commit -m "${commitMsg}"`, { stdio: 'inherit' });
-
-  // Push
   execSync('git push origin main', { stdio: 'inherit' });
-
-  // Deploy to Cloudflare
-  execSync('opennextjs-cloudflare build && wrangler deploy', { stdio: 'inherit' });
-
-  console.log('✅ Auto-commit, push, and deploy completed successfully!');
+  execSync('npx opennextjs-cloudflare build && npx wrangler deploy', {
+    stdio: 'inherit',
+    env: process.env
+  });
+  console.log('\n✅ Auto-commit, push, and deploy completed successfully!');
 } catch (error) {
-  console.error('❌ Automation failed:', error.message);
+  console.error('\n❌ Automation failed:', error.message);
   process.exit(1);
 }

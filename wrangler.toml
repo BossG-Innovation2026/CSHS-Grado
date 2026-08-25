@@ -1,4 +1,5 @@
 name = "shs-grades"
+account_id = "3ae62bfebe9b8d70c441e29f60b3fca4"
 main = ".open-next/worker.js"
 compatibility_date = "2026-08-10"
 compatibility_flags = ["nodejs_compat"]
