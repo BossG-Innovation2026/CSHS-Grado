@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 const SEED_KEY = "grado-admin-seed-2026";
 
 export async function POST(request: Request) {
-  const { key, email } = await request.json();
+  const { key, email } = (await request.json()) as { key: string; email: string };
 
   if (key !== SEED_KEY) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
