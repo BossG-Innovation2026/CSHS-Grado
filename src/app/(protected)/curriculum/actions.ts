@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { queryAll, queryOne, runSql } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
 import { isAdmin } from "@/lib/modules";
+import * as XLSX from "xlsx";
 
 export interface ActionState {
   error?: string;
@@ -154,4 +155,90 @@ export async function deleteSubject(formData: FormData): Promise<void> {
 
   revalidatePath("/curriculum");
   revalidatePath(`/curriculum/${gradeLevelId}`);
+}
+
+function parseXlsx(text: Buffer): { code: string; title: string; terms: number }[] {
+  const wb = XLSX.read(text, { type: "buffer" });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { defval: "" }) as Record<string, string>[];
+  return rows.map((r) => ({
+    code: String(r["Code"] ?? r["code"] ?? "").trim(),
+    title: String(r["Title"] ?? r["title"] ?? "").trim(),
+    terms: Number(r["Terms"] ?? r["terms"] ?? 1),
+  }));
+}
+
+export interface BulkSubjectResult {
+  added: number;
+  skipped: number;
+  invalid: number;
+  errors: string[];
+}
+
+export async function bulkAddSubjects(formData: FormData): Promise<BulkSubjectResult> {
+  const actor = await currentAdmin();
+  if (!actor) return { added: 0, skipped: 0, invalid: 0, errors: ["You are not authorized to modify the curriculum."] };
+
+  const gradeLevelId = String(formData.get("gradeLevelId") ?? "");
+  const level = await getGradeLevel(gradeLevelId);
+  if (!level) return { added: 0, skipped: 0, invalid: 0, errors: ["Grade level not found."] };
+
+  const file = formData.get("file");
+  if (!file || typeof file === "string") return { added: 0, skipped: 0, invalid: 0, errors: ["Choose an Excel file to upload."] };
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const rows = parseXlsx(buffer);
+  if (rows.length === 0) return { added: 0, skipped: 0, invalid: 0, errors: ["The file is empty or could not be parsed."] };
+
+  let added = 0;
+  let skipped = 0;
+  let invalid = 0;
+  const errors: string[] = [];
+
+  for (const row of rows) {
+    const code = row.code;
+    const title = row.title;
+    const terms = Number(row.terms) || 1;
+
+    if (!code) {
+      invalid += 1;
+      errors.push("Row missing subject code.");
+      continue;
+    }
+    if (!title) {
+      invalid += 1;
+      errors.push(`Subject code ${code} is missing a title.`);
+      continue;
+    }
+    if (!Number.isInteger(terms) || terms < 1) {
+      invalid += 1;
+      errors.push(`Subject code ${code} has invalid terms.`);
+      continue;
+    }
+
+    const existing = await queryOne<{ id: string }>(
+      "SELECT id FROM subject WHERE gradeLevelId = ? AND code = ?",
+      gradeLevelId,
+      code
+    );
+    if (existing) {
+      skipped += 1;
+      continue;
+    }
+
+    await runSql(
+      "INSERT INTO subject (id, gradeLevelId, code, title, terms, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
+      randomUUID(),
+      gradeLevelId,
+      code,
+      title,
+      terms,
+      Date.now()
+    );
+    added += 1;
+  }
+
+  revalidatePath("/curriculum");
+  revalidatePath(`/curriculum/${gradeLevelId}`);
+  return { added, skipped, invalid, errors };
 }

@@ -12,7 +12,7 @@ import {
 import { RenameClassForm } from "../rename-class-form";
 import { AddClassSubjectForm } from "../add-class-subject-form";
 import { EnrollStudentForm } from "../enroll-student-form";
-import { UploadStudentsForm } from "../upload-students-form";
+import { UploadStudentsForm, DownloadStudentTemplate } from "../upload-students-form";
 import { SubjectTeacherSelect } from "../subject-teacher-select";
 import { RemoveClassSubjectButton } from "../remove-class-subject-button";
 import { UnenrollStudentButton } from "../unenroll-student-button";
@@ -177,12 +177,7 @@ export default async function ClassDetailPage({
               </p>
             </div>
             {canEdit && (
-              <a
-                href={`/classes/${cls.id}/template.csv`}
-                className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent-strong"
-              >
-                Download template
-              </a>
+              <DownloadStudentTemplate />
             )}
           </div>
         </div>

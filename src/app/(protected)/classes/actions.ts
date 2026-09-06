@@ -8,6 +8,7 @@ import { queryAll, queryOne, runSql } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
 import { isAdmin } from "@/lib/modules";
 import { TERMS, type Term } from "@/lib/terms";
+import * as XLSX from "xlsx";
 
 export interface ActionState {
   error?: string;
@@ -465,25 +466,10 @@ export async function enrollStudent(
   return { ok: true };
 }
 
-function parseCsv(text: string): string[][] {
-  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
-  const rows: string[][] = [];
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    const fields: string[] = [];
-    let cur = "";
-    let inQuotes = false;
-    for (const ch of line) {
-      if (ch === '"') inQuotes = !inQuotes;
-      else if (ch === "," && !inQuotes) {
-        fields.push(cur.trim());
-        cur = "";
-      } else cur += ch;
-    }
-    fields.push(cur.trim());
-    rows.push(fields);
-  }
-  return rows;
+function parseXlsx(text: Buffer): Record<string, string>[] {
+  const wb = XLSX.read(text, { type: "buffer" });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(ws, { defval: "" }) as Record<string, string>[];
 }
 
 export async function enrollFromTemplate(
@@ -502,13 +488,13 @@ export async function enrollFromTemplate(
   if (passwordError) return { error: passwordError };
 
   const file = formData.get("file");
-  if (!file || typeof file === "string") return { error: "Choose a CSV file to upload." };
-  const text = await file.text();
+  if (!file || typeof file === "string") return { error: "Choose an Excel file to upload." };
+  const buffer = Buffer.from(await file.arrayBuffer());
 
-  const rows = parseCsv(text);
+  const rows = parseXlsx(buffer);
   if (rows.length === 0) return { error: "The file is empty." };
 
-  const header = rows[0];
+  const header = Object.keys(rows[0]);
   if (
     header.length === 5 &&
     header[0].toUpperCase() === "LRN" &&
@@ -521,15 +507,11 @@ export async function enrollFromTemplate(
   let skipped = 0;
   let invalid = 0;
   for (const row of rows) {
-    if (row.length < 4) {
-      invalid += 1;
-      continue;
-    }
-    const lrn = String(row[0] ?? "").trim();
-    const surname = String(row[1] ?? "").trim();
-    const firstname = String(row[2] ?? "").trim();
-    const middlename = String(row[3] ?? "").trim();
-    const sex = String(row[4] ?? "").trim().toUpperCase();
+    const lrn = String(row["LRN"] ?? "").trim();
+    const surname = String(row["Surname"] ?? "").trim();
+    const firstname = String(row["Firstname"] ?? "").trim();
+    const middlename = String(row["Middlename"] ?? "").trim();
+    const sex = String(row["Sex"] ?? "").trim().toUpperCase();
 
     if (!lrn || !surname || !firstname || (sex !== "M" && sex !== "F")) {
       invalid += 1;

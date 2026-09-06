@@ -11,7 +11,7 @@ export function UploadStudentsForm({ classId }: { classId: string }) {
     <PasswordConfirmForm action={action} className="space-y-2">
       <h3 className="text-sm font-semibold text-foreground">Upload template</h3>
       <p className="text-xs text-muted">
-        Fill the downloaded template with students and upload the CSV here. Students are matched by
+        Fill the downloaded Excel template with students and upload here. Students are matched by
         LRN; already-enrolled ones are skipped.
       </p>
       <input type="hidden" name="classId" value={classId} />
@@ -19,7 +19,7 @@ export function UploadStudentsForm({ classId }: { classId: string }) {
         <input
           type="file"
           name="file"
-          accept=".csv,text/csv"
+          accept=".xlsx"
           required
           className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-panel-hover file:px-3 file:py-1 file:text-sm file:text-foreground"
         />

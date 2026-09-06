@@ -3,6 +3,7 @@ import { requireModule } from "@/lib/access";
 import { isAdmin } from "@/lib/access";
 import { deleteGradeLevel, deleteSubject, getGradeLevel, listSubjects } from "../actions";
 import { AddSubjectForm } from "../add-subject-form";
+import { BulkUploadSubjectsForm } from "../bulk-upload-subjects-form";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,12 @@ export default async function GradeLevelDetailPage({
         <div className="mt-6 max-w-3xl rounded-lg border border-border bg-surface p-4">
           <h2 className="text-sm font-semibold text-foreground">Add subject</h2>
           <AddSubjectForm gradeLevelId={level.id} />
+        </div>
+      )}
+
+      {admin && (
+        <div className="mt-6">
+          <BulkUploadSubjectsForm gradeLevelId={level.id} />
         </div>
       )}
 
