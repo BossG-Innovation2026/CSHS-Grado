@@ -25,6 +25,7 @@ export interface SubjectRow {
   code: string;
   title: string;
   terms: number;
+  creditUnits: number;
   createdAt: number;
 }
 
@@ -50,7 +51,7 @@ export async function getGradeLevel(id: string): Promise<GradeLevelRow | undefin
 
 export async function listSubjects(gradeLevelId: string): Promise<SubjectRow[]> {
   return queryAll<SubjectRow>(
-    `SELECT id, gradeLevelId, code, title, terms, createdAt
+    `SELECT id, gradeLevelId, code, title, terms, creditUnits, createdAt
      FROM subject WHERE gradeLevelId = ? ORDER BY title COLLATE NOCASE`,
     gradeLevelId
   );
@@ -116,11 +117,15 @@ export async function addSubject(formData: FormData): Promise<ActionState> {
   const code = String(formData.get("code") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
   const terms = Number(formData.get("terms") ?? 1);
+  const creditUnits = Number(formData.get("creditUnits") ?? 1);
 
   if (!code) return { error: "Subject code is required." };
   if (!title) return { error: "Subject title is required." };
   if (!Number.isInteger(terms) || terms < 1) {
     return { error: "Number of terms must be at least 1." };
+  }
+  if (!Number.isInteger(creditUnits) || creditUnits < 1) {
+    return { error: "Credit units must be at least 1." };
   }
 
   const existing = await queryOne<{ id: string }>(
@@ -131,12 +136,13 @@ export async function addSubject(formData: FormData): Promise<ActionState> {
   if (existing) return { error: `Subject ${code} already exists in ${level.name}.` };
 
   await runSql(
-    "INSERT INTO subject (id, gradeLevelId, code, title, terms, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
+    "INSERT INTO subject (id, gradeLevelId, code, title, terms, creditUnits, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
     randomUUID(),
     gradeLevelId,
     code,
     title,
     terms,
+    creditUnits,
     Date.now()
   );
 
@@ -157,7 +163,7 @@ export async function deleteSubject(formData: FormData): Promise<void> {
   revalidatePath(`/curriculum/${gradeLevelId}`);
 }
 
-function parseXlsx(text: Buffer): { code: string; title: string; terms: number }[] {
+function parseXlsx(text: Buffer): { code: string; title: string; terms: number; creditUnits: number }[] {
   const wb = XLSX.read(text, { type: "buffer" });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(ws, { defval: "" }) as Record<string, string>[];
@@ -165,6 +171,7 @@ function parseXlsx(text: Buffer): { code: string; title: string; terms: number }
     code: String(r["Code"] ?? r["code"] ?? "").trim(),
     title: String(r["Title"] ?? r["title"] ?? "").trim(),
     terms: Number(r["Terms"] ?? r["terms"] ?? 1),
+    creditUnits: Number(r["Credit Units"] ?? r["creditUnits"] ?? 1),
   }));
 }
 
@@ -199,6 +206,7 @@ export async function bulkAddSubjects(formData: FormData): Promise<BulkSubjectRe
     const code = row.code;
     const title = row.title;
     const terms = Number(row.terms) || 1;
+    const creditUnits = Number(row.creditUnits) || 1;
 
     if (!code) {
       invalid += 1;
@@ -215,6 +223,11 @@ export async function bulkAddSubjects(formData: FormData): Promise<BulkSubjectRe
       errors.push(`Subject code ${code} has invalid terms.`);
       continue;
     }
+    if (!Number.isInteger(creditUnits) || creditUnits < 1) {
+      invalid += 1;
+      errors.push(`Subject code ${code} has invalid credit units.`);
+      continue;
+    }
 
     const existing = await queryOne<{ id: string }>(
       "SELECT id FROM subject WHERE gradeLevelId = ? AND code = ?",
@@ -227,12 +240,13 @@ export async function bulkAddSubjects(formData: FormData): Promise<BulkSubjectRe
     }
 
     await runSql(
-      "INSERT INTO subject (id, gradeLevelId, code, title, terms, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT INTO subject (id, gradeLevelId, code, title, terms, creditUnits, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
       randomUUID(),
       gradeLevelId,
       code,
       title,
       terms,
+      creditUnits,
       Date.now()
     );
     added += 1;

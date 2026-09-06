@@ -69,6 +69,7 @@ export default async function GradeLevelDetailPage({
               <th className="px-4 py-3">Code</th>
               <th className="px-4 py-3">Subject</th>
               <th className="px-4 py-3">Terms</th>
+              <th className="px-4 py-3">Credit Units</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
@@ -80,6 +81,7 @@ export default async function GradeLevelDetailPage({
                 <td className="px-4 py-3 text-xs text-muted">
                   {s.terms} term{s.terms === 1 ? "" : "s"}
                 </td>
+                <td className="px-4 py-3 text-xs text-muted">{s.creditUnits}</td>
                 <td className="px-4 py-3 text-right">
                   {admin && (
                     <form action={deleteSubject}>
@@ -98,7 +100,7 @@ export default async function GradeLevelDetailPage({
             ))}
             {subjects.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-subtle">
+                <td colSpan={5} className="px-4 py-8 text-center text-subtle">
                   No subjects yet. {admin ? "Use the form above to add one." : ""}
                 </td>
               </tr>

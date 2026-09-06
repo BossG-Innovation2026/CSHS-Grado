@@ -7,9 +7,9 @@ export async function GET() {
   await requireModule("curriculum");
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([
-    ["Code", "Title", "Terms"],
-    ["GEN-MATH", "General Mathematics", 3],
-    ["OC11", "Oral Communication", 1],
+    ["Code", "Title", "Terms", "Credit Units"],
+    ["GEN-MATH", "General Mathematics", 3, 1],
+    ["OC11", "Oral Communication", 1, 1],
   ]);
   XLSX.utils.book_append_sheet(wb, ws, "Subjects");
   const buffer = XLSX.write(wb, { bookType: "xlsx", type: "buffer" });
