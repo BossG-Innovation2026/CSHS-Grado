@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { createAccount, type ActionState } from "./actions";
 import { ModuleCheckboxes } from "@/components/module-checkboxes";
+import { PasswordInput } from "@/components/password-input";
 import { ROLE_LABELS } from "@/lib/modules";
 
 export function CreateAccountForm({ roleOptions }: { roleOptions: string[] }) {
@@ -59,14 +60,12 @@ export function CreateAccountForm({ roleOptions }: { roleOptions: string[] }) {
           <label htmlFor="password" className="mb-1 block text-sm font-medium text-foreground">
             Temporary password
           </label>
-          <input
+          <PasswordInput
             id="password"
             name="password"
-            type="password"
             required
             minLength={8}
             placeholder="At least 8 characters"
-            className="w-full rounded-md border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none"
           />
         </div>
       </div>

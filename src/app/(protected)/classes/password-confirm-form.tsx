@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
+import { PasswordInput } from "@/components/password-input";
 
 export function PasswordConfirmForm({
   action,
@@ -63,8 +64,7 @@ export function PasswordConfirmForm({
             <p className="mt-1 text-xs text-muted">
               Enter your password to make this change.
             </p>
-            <input
-              type="password"
+            <PasswordInput
               value={password}
               autoFocus
               onChange={(e) => setPassword(e.target.value)}
@@ -75,7 +75,6 @@ export function PasswordConfirmForm({
                 }
               }}
               placeholder="Your password"
-              className="mt-3 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-subtle focus:border-accent focus:outline-none"
             />
             <div className="mt-4 flex justify-end gap-2">
               <button

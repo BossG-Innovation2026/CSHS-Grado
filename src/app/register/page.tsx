@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { registerAccount, type RegisterState } from "./actions";
+import { PasswordInput } from "@/components/password-input";
 
 export default function RegisterPage() {
   const [state, action, pending] = useActionState<RegisterState, FormData>(registerAccount, null);
@@ -47,14 +48,12 @@ export default function RegisterPage() {
             <label htmlFor="password" className="mb-1 block text-sm font-medium text-foreground">
               Password
             </label>
-            <input
+            <PasswordInput
               id="password"
               name="password"
-              type="password"
               required
               minLength={8}
               placeholder="At least 8 characters"
-              className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-subtle focus:border-accent focus:outline-none"
             />
           </div>
           {state?.error && (

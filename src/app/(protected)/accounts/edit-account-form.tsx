@@ -9,6 +9,7 @@ import {
   type AccountRow,
 } from "./actions";
 import { ModuleCheckboxes } from "@/components/module-checkboxes";
+import { PasswordInput } from "@/components/password-input";
 import { parsePermissions, MODULES } from "@/lib/modules";
 
 const MODULE_KEYS = MODULES.map((m) => m.key);
@@ -79,15 +80,13 @@ export function EditAccountForm({
             <label htmlFor="password" className="mb-1 block text-sm font-medium text-foreground">
               New password
             </label>
-            <input
+            <PasswordInput
               id="password"
               name="password"
-              type="password"
               required
               minLength={8}
               disabled={!canEdit}
               placeholder="At least 8 characters"
-              className="w-full rounded-md border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none disabled:bg-panel"
             />
           </div>
           {canEdit && (

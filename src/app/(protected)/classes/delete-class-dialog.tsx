@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { deleteClass, type ActionState } from "./actions";
+import { PasswordInput } from "@/components/password-input";
 
 export function DeleteClassDialog({ classId, className }: { classId: string; className: string }) {
   const [open, setOpen] = useState(false);
@@ -38,13 +39,11 @@ export function DeleteClassDialog({ classId, className }: { classId: string; cla
             </p>
             <label className="mt-3 block">
               <span className="text-xs text-muted">Confirm your password</span>
-              <input
-                type="password"
+              <PasswordInput
                 name="password"
                 required
                 autoFocus
                 placeholder="Your password"
-                className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-subtle focus:border-accent focus:outline-none"
               />
             </label>
             {state.error && (

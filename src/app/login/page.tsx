@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
+import { PasswordInput } from "@/components/password-input";
 
 function RegisteredNote() {
   const params = useSearchParams();
@@ -67,13 +68,12 @@ export default function LoginPage() {
             <label htmlFor="password" className="mb-1 block text-sm font-medium text-foreground">
               Password
             </label>
-            <input
+            <PasswordInput
               id="password"
-              type="password"
+              name="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-subtle focus:border-accent focus:outline-none"
             />
           </div>
           {error && <p className="rounded-md bg-accent-soft px-3 py-2 text-sm text-foreground">{error}</p>}
