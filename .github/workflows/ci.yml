@@ -1,0 +1,71 @@
+name: CI
+
+# Runs on every pull request and on pushes to branches other than main
+# (main is covered by the Deploy workflow, which runs the same checks first).
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npx opennextjs-cloudflare build
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
+      BETTER_AUTH_SECRET: ci-only-secret-not-used-anywhere-else-000
+      BETTER_AUTH_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply migrations to a fresh database
+        run: npm run db:migrate
+      - name: Migrations match the schema (no un-generated changes)
+        run: |
+          npx drizzle-kit generate
+          if [ -n "$(git status --porcelain drizzle/)" ]; then
+            echo "::error::src/db/schema.ts changed without a migration. Run npm run db:generate and commit drizzle/."
+            git status --porcelain drizzle/
+            exit 1
+          fi
+      - run: npm run build
+      - run: npx playwright install --with-deps --only-shell chromium
+      - name: Start app
+        run: |
+          npm run start -- --port 3000 &
+          for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:3000/login && exit 0; sleep 2; done
+          echo "::error::app did not start"; exit 1
+      - name: E2E - first-user bootstrap and account management
+        run: node scripts/e2e-m1.js
+      - name: E2E - password-confirmed class changes
+        run: node scripts/verify-passwords.js

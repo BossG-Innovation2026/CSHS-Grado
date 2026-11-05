@@ -1,12 +1,13 @@
+import "server-only";
 import { betterAuth } from "better-auth";
-import { getDatabase, getEnvVar } from "@/lib/db";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { getDb, schema, type Db } from "@/db";
+import { getEnvVar, requireEnvVar } from "@/lib/env";
 
-let cachedAuth: ReturnType<typeof createAuth> | null = null;
-
-function createAuth() {
+function createAuth(db: Db) {
   return betterAuth({
-    database: getDatabase(),
-    secret: getEnvVar("BETTER_AUTH_SECRET") ?? "dev-secret-change-in-production",
+    database: drizzleAdapter(db, { provider: "pg", schema: schema.authSchema }),
+    secret: requireEnvVar("BETTER_AUTH_SECRET", "dev-secret-change-in-production"),
     baseURL: getEnvVar("BETTER_AUTH_URL") ?? "http://localhost:3000",
     emailAndPassword: {
       enabled: true,
@@ -26,9 +27,9 @@ function createAuth() {
           input: false,
         },
         active: {
-          type: "number",
+          type: "boolean",
           required: true,
-          defaultValue: 1,
+          defaultValue: true,
           input: false,
         },
       },
@@ -37,6 +38,9 @@ function createAuth() {
       expiresIn: 60 * 60 * 24 * 7,
     },
     rateLimit: {
+      // Counters live in Postgres so the limit holds across Worker isolates
+      // (in-memory counters reset per isolate and are easy to bypass).
+      storage: "database",
       window: 60,
       max: 300,
       customRules: {
@@ -46,7 +50,16 @@ function createAuth() {
   });
 }
 
-export function getAuth() {
-  if (!cachedAuth) cachedAuth = createAuth();
-  return cachedAuth;
+type Auth = ReturnType<typeof createAuth>;
+const authByDb = new WeakMap<Db, Auth>();
+
+/** better-auth bound to the current request's database connection. */
+export function getAuth(): Auth {
+  const db = getDb();
+  let auth = authByDb.get(db);
+  if (!auth) {
+    auth = createAuth(db);
+    authByDb.set(db, auth);
+  }
+  return auth;
 }

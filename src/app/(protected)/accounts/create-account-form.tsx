@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useActionState } from "react";
 import { createAccount, type ActionState } from "./actions";
@@ -81,7 +81,7 @@ export function CreateAccountForm({ roleOptions }: { roleOptions: string[] }) {
         disabled={pending}
         className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent-strong disabled:opacity-50"
       >
-        {pending ? "Creatingâ€¦" : "Create account"}
+        {pending ? "Creating…" : "Create account"}
       </button>
     </form>
   );
