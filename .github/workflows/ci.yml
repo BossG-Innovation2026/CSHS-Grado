@@ -1,11 +1,11 @@
 name: CI
 
-# Runs on every pull request and on pushes to branches other than main
-# (main is covered by the Deploy workflow, which runs the same checks first).
+# Runs on every pull request (and on demand). main is covered by the Deploy
+# workflow, which runs the same checks first. Not on branch pushes, so a PR
+# does not run everything twice.
 on:
   pull_request:
-  push:
-    branches-ignore: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
