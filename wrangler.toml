@@ -28,3 +28,18 @@ migrations_dir = "legacy/d1-migrations"
 
 [vars]
 BETTER_AUTH_URL = "https://shs-grades.innov-proj2026.workers.dev"
+
+# DEMO site: same app, separate Worker and separate (fake-data) Neon database.
+# Created by scripts/go-live-demo.mjs; deployed by the Deploy workflow when the
+# DATABASE_URL_DEMO secret exists. Never point this at the real database.
+[env.demo]
+name = "grado-demo"
+
+[[env.demo.hyperdrive]]
+binding = "HYPERDRIVE"
+id = "REPLACE_WITH_DEMO_HYPERDRIVE_ID"
+localConnectionString = "postgres://postgres:postgres@127.0.0.1:5432/postgres"
+
+[env.demo.vars]
+BETTER_AUTH_URL = "https://grado-demo.innov-proj2026.workers.dev"
+DEMO_MODE = "true"
