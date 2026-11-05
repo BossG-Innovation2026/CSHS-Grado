@@ -14,7 +14,7 @@ assets = { directory = ".open-next/assets", binding = "ASSETS" }
 # Paste the printed id below. CI refuses to deploy while the placeholder is here.
 [[hyperdrive]]
 binding = "HYPERDRIVE"
-id = "REPLACE_WITH_HYPERDRIVE_ID"
+id = "e8cd29aff1aa40bdb11c92cb18ee7567"
 # Used by `npm run preview` (local workerd); matches .env.example.
 localConnectionString = "postgres://postgres:postgres@127.0.0.1:5432/postgres"
 

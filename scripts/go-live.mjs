@@ -148,6 +148,35 @@ for (let attempt = 0; attempt < 3 && !cfToken; attempt++) {
 if (!cfToken) fail("No valid Cloudflare token.");
 ok("Cloudflare token is valid");
 
+// The token must reach Grado's account and include Hyperdrive + D1 access.
+{
+  const headers = { Authorization: `Bearer ${cfToken}` };
+  const get = async (path) => {
+    const res = await fetch(`https://api.cloudflare.com/client/v4${path}`, { headers }).catch(() => null);
+    return res ? { status: res.status, body: await res.json().catch(() => null) } : { status: 0, body: null };
+  };
+  const accounts = (await get("/accounts?per_page=50")).body?.result ?? [];
+  if (accounts.length && !accounts.some((a) => a.id === accountId)) {
+    const list = accounts.map((a) => `${a.name} (${a.id})`).join(", ");
+    fail(`This token is for a different Cloudflare account: ${list}.
+    Grado's Worker is in account ${accountId} (the one that owns shs-grades.innov-proj2026.workers.dev).
+    Sign in to that account in the Cloudflare dashboard and create the token there.`);
+  }
+  for (const [label, path] of [
+    ["Hyperdrive", `/accounts/${accountId}/hyperdrive/configs`],
+    ["D1", `/accounts/${accountId}/d1/database?per_page=1`],
+  ]) {
+    if (label === "D1" && fresh) continue;
+    const r = await get(path);
+    if (!r.body?.success) {
+      fail(`The token cannot use ${label} on account ${accountId}.
+    In Cloudflare > API Tokens, click the token's "..." > Edit, add "Account | ${label} | Edit",
+    make sure Account Resources includes that account, save (the value stays the same), and re-run.`);
+    }
+  }
+  ok("Token reaches Grado's account with Hyperdrive and D1 access");
+}
+
 // Wrangler must use the new token, not an old one from this PC's environment.
 const cfEnv = { ...process.env, CLOUDFLARE_API_TOKEN: cfToken, CLOUDFLARE_ACCOUNT_ID: accountId };
 delete cfEnv.CF_API_TOKEN;
