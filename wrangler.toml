@@ -6,11 +6,25 @@ compatibility_flags = ["nodejs_compat"]
 
 assets = { directory = ".open-next/assets", binding = "ASSETS" }
 
+# Postgres (Neon) through Cloudflare Hyperdrive (connection pooling at the edge).
+# Create it once (see docs/architecture.md, "Go-live steps"):
+#   npx wrangler hyperdrive create grado-db --caching-disabled --connection-string="<Neon direct URL>"
+# --caching-disabled is required: Hyperdrive otherwise serves reads up to 60 s old
+# and never invalidates on writes (stale pages, sign-outs that don't take effect).
+# Paste the printed id below. CI refuses to deploy while the placeholder is here.
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "e8cd29aff1aa40bdb11c92cb18ee7567"
+# Used by `npm run preview` (local workerd); matches .env.example.
+localConnectionString = "postgres://postgres:postgres@127.0.0.1:5432/postgres"
+
+# LEGACY: the old D1 database. Kept only so `wrangler d1 export shs-db --remote`
+# works for the one-time data move. Remove after the import is verified.
 [[d1_databases]]
-binding = "DB"
+binding = "LEGACY_D1"
 database_name = "shs-db"
 database_id = "15462369-18fa-4cf4-9684-3c56e3538540"
-migrations_dir = "migrations"
+migrations_dir = "legacy/d1-migrations"
 
 [vars]
 BETTER_AUTH_URL = "https://shs-grades.innov-proj2026.workers.dev"

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireModule } from "@/lib/access";
 import { isAdmin } from "@/lib/access";
-import { deleteGradeLevel, deleteSubject, getGradeLevel, listSubjects } from "../actions";
+import { deleteGradeLevel, deleteSubject } from "../actions";
+import { getGradeLevel, listSubjects } from "@/server/curriculum";
 import { AddSubjectForm } from "../add-subject-form";
 import { BulkUploadSubjectsForm } from "../bulk-upload-subjects-form";
 

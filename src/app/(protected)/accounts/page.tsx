@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/access";
 import { ROLE_LABELS } from "@/lib/access";
-import { listAccounts } from "./actions";
+import { listAccounts } from "@/server/accounts";
 
 export const dynamic = "force-dynamic";
 

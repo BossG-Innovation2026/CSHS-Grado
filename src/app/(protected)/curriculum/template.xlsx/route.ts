@@ -1,21 +1,18 @@
 import { requireModule } from "@/lib/access";
-import * as XLSX from "xlsx";
+import { buildWorkbook, XLSX_MIME } from "@/server/spreadsheet";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   await requireModule("curriculum");
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet([
+  const file = buildWorkbook("Subjects", [
     ["Code", "Title", "Terms", "Credit Units"],
     ["GEN-MATH", "General Mathematics", 3, 1],
     ["OC11", "Oral Communication", 1, 1],
   ]);
-  XLSX.utils.book_append_sheet(wb, ws, "Subjects");
-  const buffer = XLSX.write(wb, { bookType: "xlsx", type: "buffer" });
-  return new Response(buffer, {
+  return new Response(file, {
     headers: {
-      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Type": XLSX_MIME,
       "Content-Disposition": 'attachment; filename="subjects_template.xlsx"',
     },
   });

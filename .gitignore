@@ -53,3 +53,13 @@ next-env.d.ts
 *.log
 *.tmp.js
 repro.pid
+
+# local Postgres (PGlite) data
+/.pglite/
+
+# exported production data (personal data: never commit)
+/d1-export*.sql
+/d1-export*.sqlite
+
+# keep the env template
+!.env.example

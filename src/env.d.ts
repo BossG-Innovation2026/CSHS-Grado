@@ -2,7 +2,8 @@ import "@cloudflare/workers-types";
 
 declare global {
   interface CloudflareEnv {
-    DB: D1Database;
+    /** Postgres (Neon) through Cloudflare Hyperdrive. */
+    HYPERDRIVE: Hyperdrive;
     BETTER_AUTH_SECRET?: string;
     BETTER_AUTH_URL?: string;
   }

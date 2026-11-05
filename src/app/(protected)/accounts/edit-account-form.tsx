@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useActionState } from "react";
 import {
@@ -67,7 +67,7 @@ export function EditAccountForm({
               disabled={permPending}
               className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent-strong disabled:opacity-50"
             >
-              {permPending ? "Savingâ€¦" : "Save modules"}
+              {permPending ? "Saving…" : "Save modules"}
             </button>
           )}
         </form>
@@ -95,7 +95,7 @@ export function EditAccountForm({
               disabled={pwPending}
               className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-panel-hover disabled:opacity-50"
             >
-              {pwPending ? "Savingâ€¦" : "Reset password"}
+              {pwPending ? "Saving…" : "Reset password"}
             </button>
           )}
         </form>
@@ -116,12 +116,12 @@ export function EditAccountForm({
                 account.active ? "bg-panel-hover hover:bg-accent" : "bg-accent hover:bg-accent-strong"
               }`}
             >
-              {activePending ? "Savingâ€¦" : account.active ? "Deactivate account" : "Activate account"}
+              {activePending ? "Saving…" : account.active ? "Deactivate account" : "Activate account"}
             </button>
           ) : (
             <p className="text-sm text-muted">
               {account.active ? "Active" : "Deactivated"}
-              {editingSelf && " â€” you cannot deactivate your own account."}
+              {editingSelf && " — you cannot deactivate your own account."}
             </p>
           )}
           <div className="mt-2">

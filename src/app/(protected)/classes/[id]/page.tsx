@@ -8,7 +8,7 @@ import {
   listClassSubjects,
   listStudents,
   listSubjectsByGrade,
-} from "../actions";
+} from "@/server/classes";
 import { RenameClassForm } from "../rename-class-form";
 import { AddClassSubjectForm } from "../add-class-subject-form";
 import { EnrollStudentForm } from "../enroll-student-form";

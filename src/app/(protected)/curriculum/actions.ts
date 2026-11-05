@@ -1,178 +1,18 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
+import { and, eq, max } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { queryAll, queryOne, runSql } from "@/lib/db";
-import { getSessionUser } from "@/lib/session";
-import { isAdmin } from "@/lib/modules";
-import * as XLSX from "xlsx";
+import { getDb, schema } from "@/db";
+import { adminUser } from "@/server/guards";
+import { findGradeLevel } from "@/server/curriculum";
+import { cell, chunk, readFirstSheet } from "@/server/spreadsheet";
+
+const { gradeLevel, subject } = schema;
 
 export interface ActionState {
   error?: string;
   ok?: boolean;
-}
-
-export interface GradeLevelRow {
-  id: string;
-  name: string;
-  sortOrder: number;
-  createdAt: number;
-}
-
-export interface SubjectRow {
-  id: string;
-  gradeLevelId: string;
-  code: string;
-  title: string;
-  terms: number;
-  creditUnits: number;
-  createdAt: number;
-}
-
-async function currentAdmin() {
-  const user = await getSessionUser();
-  if (!user || !isAdmin(user)) return null;
-  return user;
-}
-
-export async function listGradeLevels(): Promise<GradeLevelRow[]> {
-  return queryAll<GradeLevelRow>(
-    `SELECT id, name, sortOrder, createdAt
-     FROM grade_level ORDER BY sortOrder`
-  );
-}
-
-export async function getGradeLevel(id: string): Promise<GradeLevelRow | undefined> {
-  return queryOne<GradeLevelRow>(
-    `SELECT id, name, sortOrder, createdAt FROM grade_level WHERE id = ?`,
-    id
-  );
-}
-
-export async function listSubjects(gradeLevelId: string): Promise<SubjectRow[]> {
-  return queryAll<SubjectRow>(
-    `SELECT id, gradeLevelId, code, title, terms, creditUnits, createdAt
-     FROM subject WHERE gradeLevelId = ? ORDER BY title COLLATE NOCASE`,
-    gradeLevelId
-  );
-}
-
-export async function countSubjects(): Promise<Record<string, number>> {
-  const rows = await queryAll<{ gradeLevelId: string; count: number }>(
-    `SELECT gradeLevelId, COUNT(*) AS count FROM subject GROUP BY gradeLevelId`
-  );
-  return Object.fromEntries(rows.map((r) => [r.gradeLevelId, Number(r.count)]));
-}
-
-export async function addGradeLevel(
-  _prev: ActionState,
-  formData: FormData
-): Promise<ActionState> {
-  const actor = await currentAdmin();
-  if (!actor) return { error: "You are not authorized to modify the curriculum." };
-
-  const name = String(formData.get("name") ?? "").trim();
-  if (!name) return { error: "Choose a grade level." };
-
-  const existing = await queryOne<{ id: string }>(
-    "SELECT id FROM grade_level WHERE name = ?",
-    name
-  );
-  if (existing) return { error: `${name} already exists.` };
-
-  const maxOrder = await queryOne<{ max: number }>(
-    "SELECT MAX(sortOrder) AS max FROM grade_level"
-  );
-
-  await runSql(
-    "INSERT INTO grade_level (id, name, sortOrder, createdAt) VALUES (?, ?, ?, ?)",
-    randomUUID(),
-    name,
-    (maxOrder?.max ?? 12) + 1,
-    Date.now()
-  );
-
-  revalidatePath("/curriculum");
-  return { ok: true };
-}
-
-export async function deleteGradeLevel(formData: FormData): Promise<void> {
-  const actor = await currentAdmin();
-  if (!actor) return;
-
-  const id = String(formData.get("id") ?? "");
-  await runSql("DELETE FROM grade_level WHERE id = ?", id);
-
-  revalidatePath("/curriculum");
-}
-
-export async function addSubject(formData: FormData): Promise<ActionState> {
-  const actor = await currentAdmin();
-  if (!actor) return { error: "You are not authorized to modify the curriculum." };
-
-  const gradeLevelId = String(formData.get("gradeLevelId") ?? "");
-  const level = await getGradeLevel(gradeLevelId);
-  if (!level) return { error: "Grade level not found." };
-
-  const code = String(formData.get("code") ?? "").trim();
-  const title = String(formData.get("title") ?? "").trim();
-  const terms = Number(formData.get("terms") ?? 1);
-  const creditUnits = Number(formData.get("creditUnits") ?? 1);
-
-  if (!code) return { error: "Subject code is required." };
-  if (!title) return { error: "Subject title is required." };
-  if (!Number.isInteger(terms) || terms < 1) {
-    return { error: "Number of terms must be at least 1." };
-  }
-  if (!Number.isInteger(creditUnits) || creditUnits < 1) {
-    return { error: "Credit units must be at least 1." };
-  }
-
-  const existing = await queryOne<{ id: string }>(
-    "SELECT id FROM subject WHERE gradeLevelId = ? AND code = ?",
-    gradeLevelId,
-    code
-  );
-  if (existing) return { error: `Subject ${code} already exists in ${level.name}.` };
-
-  await runSql(
-    "INSERT INTO subject (id, gradeLevelId, code, title, terms, creditUnits, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    randomUUID(),
-    gradeLevelId,
-    code,
-    title,
-    terms,
-    creditUnits,
-    Date.now()
-  );
-
-  revalidatePath("/curriculum");
-  revalidatePath(`/curriculum/${gradeLevelId}`);
-  return { ok: true };
-}
-
-export async function deleteSubject(formData: FormData): Promise<void> {
-  const actor = await currentAdmin();
-  if (!actor) return;
-
-  const id = String(formData.get("id") ?? "");
-  const gradeLevelId = String(formData.get("gradeLevelId") ?? "");
-  await runSql("DELETE FROM subject WHERE id = ? AND gradeLevelId = ?", id, gradeLevelId);
-
-  revalidatePath("/curriculum");
-  revalidatePath(`/curriculum/${gradeLevelId}`);
-}
-
-function parseXlsx(text: Buffer): { code: string; title: string; terms: number; creditUnits: number }[] {
-  const wb = XLSX.read(text, { type: "buffer" });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(ws, { defval: "" }) as Record<string, string>[];
-  return rows.map((r) => ({
-    code: String(r["Code"] ?? r["code"] ?? "").trim(),
-    title: String(r["Title"] ?? r["title"] ?? "").trim(),
-    terms: Number(r["Terms"] ?? r["terms"] ?? 1),
-    creditUnits: Number(r["Credit Units"] ?? r["creditUnits"] ?? 1),
-  }));
 }
 
 export interface BulkSubjectResult {
@@ -182,77 +22,139 @@ export interface BulkSubjectResult {
   errors: string[];
 }
 
-export async function bulkAddSubjects(formData: FormData): Promise<BulkSubjectResult> {
-  const actor = await currentAdmin();
-  if (!actor) return { added: 0, skipped: 0, invalid: 0, errors: ["You are not authorized to modify the curriculum."] };
+function revalidateCurriculum(gradeLevelId?: string) {
+  revalidatePath("/curriculum");
+  if (gradeLevelId) revalidatePath(`/curriculum/${gradeLevelId}`);
+}
+
+function positiveInt(raw: unknown, fallback = 1): number {
+  if (raw === null || raw === undefined || String(raw).trim() === "") return fallback;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 1 ? n : NaN;
+}
+
+export async function addGradeLevel(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const actor = await adminUser();
+  if (!actor) return { error: "You are not authorized to modify the curriculum." };
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "Choose a grade level." };
+
+  const db = getDb();
+  const [{ maxOrder }] = await db.select({ maxOrder: max(gradeLevel.sortOrder) }).from(gradeLevel);
+  const inserted = await db
+    .insert(gradeLevel)
+    .values({ id: randomUUID(), name, sortOrder: (maxOrder ?? 12) + 1 })
+    .onConflictDoNothing({ target: gradeLevel.name })
+    .returning({ id: gradeLevel.id });
+  if (inserted.length === 0) return { error: `${name} already exists.` };
+
+  revalidateCurriculum();
+  return { ok: true };
+}
+
+export async function deleteGradeLevel(formData: FormData): Promise<void> {
+  const actor = await adminUser();
+  if (!actor) return;
+
+  const id = String(formData.get("id") ?? "");
+  await getDb().delete(gradeLevel).where(eq(gradeLevel.id, id));
+  revalidateCurriculum();
+}
+
+export async function addSubject(formData: FormData): Promise<ActionState> {
+  const actor = await adminUser();
+  if (!actor) return { error: "You are not authorized to modify the curriculum." };
 
   const gradeLevelId = String(formData.get("gradeLevelId") ?? "");
-  const level = await getGradeLevel(gradeLevelId);
-  if (!level) return { added: 0, skipped: 0, invalid: 0, errors: ["Grade level not found."] };
+  const level = await findGradeLevel(gradeLevelId);
+  if (!level) return { error: "Grade level not found." };
+
+  const code = String(formData.get("code") ?? "").trim();
+  const title = String(formData.get("title") ?? "").trim();
+  const terms = positiveInt(formData.get("terms"));
+  const creditUnits = positiveInt(formData.get("creditUnits"));
+
+  if (!code) return { error: "Subject code is required." };
+  if (!title) return { error: "Subject title is required." };
+  if (Number.isNaN(terms)) return { error: "Number of terms must be at least 1." };
+  if (Number.isNaN(creditUnits)) return { error: "Credit units must be at least 1." };
+
+  const inserted = await getDb()
+    .insert(subject)
+    .values({ id: randomUUID(), gradeLevelId, code, title, terms, creditUnits })
+    .onConflictDoNothing({ target: [subject.gradeLevelId, subject.code] })
+    .returning({ id: subject.id });
+  if (inserted.length === 0) return { error: `Subject ${code} already exists in ${level.name}.` };
+
+  revalidateCurriculum(gradeLevelId);
+  return { ok: true };
+}
+
+export async function deleteSubject(formData: FormData): Promise<void> {
+  const actor = await adminUser();
+  if (!actor) return;
+
+  const id = String(formData.get("id") ?? "");
+  const gradeLevelId = String(formData.get("gradeLevelId") ?? "");
+  await getDb()
+    .delete(subject)
+    .where(and(eq(subject.id, id), eq(subject.gradeLevelId, gradeLevelId)));
+  revalidateCurriculum(gradeLevelId);
+}
+
+export async function bulkAddSubjects(formData: FormData): Promise<BulkSubjectResult> {
+  const fail = (message: string): BulkSubjectResult => ({ added: 0, skipped: 0, invalid: 0, errors: [message] });
+
+  const actor = await adminUser();
+  if (!actor) return fail("You are not authorized to modify the curriculum.");
+
+  const gradeLevelId = String(formData.get("gradeLevelId") ?? "");
+  const level = await findGradeLevel(gradeLevelId);
+  if (!level) return fail("Grade level not found.");
 
   const file = formData.get("file");
-  if (!file || typeof file === "string") return { added: 0, skipped: 0, invalid: 0, errors: ["Choose an Excel file to upload."] };
+  if (!(file instanceof File)) return fail("Choose an Excel file to upload.");
+  const sheet = await readFirstSheet(file);
+  if ("error" in sheet) return fail(sheet.error);
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const rows = parseXlsx(buffer);
-  if (rows.length === 0) return { added: 0, skipped: 0, invalid: 0, errors: ["The file is empty or could not be parsed."] };
-
-  let added = 0;
-  let skipped = 0;
   let invalid = 0;
+  let duplicates = 0;
   const errors: string[] = [];
+  const byCode = new Map<string, { code: string; title: string; terms: number; creditUnits: number }>();
 
-  for (const row of rows) {
-    const code = row.code;
-    const title = row.title;
-    const terms = Number(row.terms) || 1;
-    const creditUnits = Number(row.creditUnits) || 1;
+  for (const row of sheet.rows) {
+    const code = cell(row, "Code", "code");
+    const title = cell(row, "Title", "title");
+    const terms = positiveInt(cell(row, "Terms", "terms"));
+    const creditUnits = positiveInt(cell(row, "Credit Units", "creditUnits"));
 
-    if (!code) {
+    let problem: string | null = null;
+    if (!code) problem = "Row missing subject code.";
+    else if (!title) problem = `Subject code ${code} is missing a title.`;
+    else if (Number.isNaN(terms)) problem = `Subject code ${code} has invalid terms.`;
+    else if (Number.isNaN(creditUnits)) problem = `Subject code ${code} has invalid credit units.`;
+    if (problem) {
       invalid += 1;
-      errors.push("Row missing subject code.");
+      errors.push(problem);
       continue;
     }
-    if (!title) {
-      invalid += 1;
-      errors.push(`Subject code ${code} is missing a title.`);
-      continue;
-    }
-    if (!Number.isInteger(terms) || terms < 1) {
-      invalid += 1;
-      errors.push(`Subject code ${code} has invalid terms.`);
-      continue;
-    }
-    if (!Number.isInteger(creditUnits) || creditUnits < 1) {
-      invalid += 1;
-      errors.push(`Subject code ${code} has invalid credit units.`);
-      continue;
-    }
-
-    const existing = await queryOne<{ id: string }>(
-      "SELECT id FROM subject WHERE gradeLevelId = ? AND code = ?",
-      gradeLevelId,
-      code
-    );
-    if (existing) {
-      skipped += 1;
-      continue;
-    }
-
-    await runSql(
-      "INSERT INTO subject (id, gradeLevelId, code, title, terms, creditUnits, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      randomUUID(),
-      gradeLevelId,
-      code,
-      title,
-      terms,
-      creditUnits,
-      Date.now()
-    );
-    added += 1;
+    if (byCode.has(code)) duplicates += 1;
+    byCode.set(code, { code, title, terms, creditUnits });
   }
 
-  revalidatePath("/curriculum");
-  revalidatePath(`/curriculum/${gradeLevelId}`);
-  return { added, skipped, invalid, errors };
+  // One INSERT per 500 rows instead of two queries per row.
+  let added = 0;
+  const db = getDb();
+  for (const part of chunk([...byCode.values()], 500)) {
+    const inserted = await db
+      .insert(subject)
+      .values(part.map((s) => ({ id: randomUUID(), gradeLevelId, ...s })))
+      .onConflictDoNothing({ target: [subject.gradeLevelId, subject.code] })
+      .returning({ id: subject.id });
+    added += inserted.length;
+  }
+
+  revalidateCurriculum(gradeLevelId);
+  return { added, skipped: byCode.size - added + duplicates, invalid, errors };
 }

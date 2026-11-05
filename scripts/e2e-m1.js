@@ -3,11 +3,11 @@ const { chromium } = require("playwright");
 const BASE = process.env.E2E_BASE ?? "http://localhost:3000";
 
 if (BASE.startsWith("http://localhost")) {
-  const { DatabaseSync } = require("node:sqlite");
-  const db = new DatabaseSync("dev.sqlite");
-  db.exec("DELETE FROM account; DELETE FROM session; DELETE FROM verification; DELETE FROM user; DELETE FROM notification;");
-  db.close();
-  console.log("Local DB wiped for a fresh bootstrap.");
+  require("node:child_process").execFileSync(
+    process.execPath,
+    ["--env-file-if-exists=.env.local", "scripts/dev-db-reset.mjs"],
+    { stdio: "inherit" }
+  );
 }
 const PASSWORD = "Password123!";
 const TEACHER_PASSWORD = "Passw0rd123!";

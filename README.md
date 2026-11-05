@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Project Grado
 
-## Getting Started
+Grades and records system for senior high schools: accounts with per-module access,
+curriculum (grade levels, subjects, credit units), classes with per-term subjects and
+subject teachers, and student enrollment with Excel bulk upload.
 
-First, run the development server:
+**Stack:** Next.js 16 · React 19 · Tailwind 4 · better-auth · Drizzle ORM · PostgreSQL
+(Neon) via Cloudflare Hyperdrive · Cloudflare Workers (OpenNext).
+Why this stack, the free-tier budget, the scale-up path and the go-live checklist are in
+[docs/architecture.md](docs/architecture.md).
+
+## Local development
+
+Prerequisites: Node.js 22.12+ (no Docker needed).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local
+npm run db:dev          # terminal 1: local Postgres on 127.0.0.1:5432 (data in ./.pglite)
+npm run db:migrate      # terminal 2: create tables
+npm run dev             # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The first account registered at `/register` becomes Super Admin.
+Optional demo data: `npm run db:seed-dev` (a teacher and the class "Grade 11 - B").
+Prefer a real Postgres? `docker compose up -d` instead of `npm run db:dev`, and remove
+`DATABASE_POOL_MAX` from `.env.local`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | What it does |
+|---------|--------------|
+| `npm run dev` | Next.js dev server |
+| `npm run check` | Typecheck + lint |
+| `npm run db:dev` | Zero-install local Postgres (PGlite) |
+| `npm run db:generate` | Create a SQL migration in `drizzle/` from `src/db/schema.ts` |
+| `npm run db:migrate` | Apply migrations to `DATABASE_URL` |
+| `npm run db:studio` | Browse the database (Drizzle Studio) |
+| `npm run db:seed-dev` | Demo data, local databases only |
+| `npm run db:import-d1 -- <file>` | One-time copy of the old D1 data into Postgres |
+| `npm run admin:promote -- <email>` | Make an account Super Admin (direct DB access) |
+| `npm run preview` | Build and run the real Worker locally (Linux/WSL, or Windows Developer Mode) |
+| `node scripts/e2e-m1.js` | E2E: first-user bootstrap and account management (wipes local accounts) |
+| `node scripts/verify-passwords.js` | E2E: password-confirmed class changes |
 
-## Learn More
+E2E scripts need `npx playwright install --only-shell chromium` once, and the app running
+on port 3000 (override with `E2E_BASE` / `APP_BASE_URL`).
 
-To learn more about Next.js, take a look at the following resources:
+## Changing the database
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Edit `src/db/schema.ts`.
+2. `npm run db:generate` and review the new file in `drizzle/`.
+3. `npm run db:migrate` locally, commit both files. CI rejects schema changes without a
+   migration; the Deploy workflow applies migrations before releasing the new Worker.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deployment
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Pushing to `main` runs `.github/workflows/deploy.yml`: checks, Worker build, migrations
+on Neon, then `wrangler deploy`. Every pull request runs `.github/workflows/ci.yml`
+(typecheck, lint, Worker build, migration drift check, E2E on Postgres).
+Required GitHub secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`,
+`BETTER_AUTH_SECRET`, `DATABASE_URL`.

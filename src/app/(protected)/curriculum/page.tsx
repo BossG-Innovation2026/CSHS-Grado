@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireModule } from "@/lib/access";
 import { isAdmin } from "@/lib/access";
-import { countSubjects, listGradeLevels } from "./actions";
+import { countSubjectsByGrade, listGradeLevels } from "@/server/curriculum";
 import { AddGradeLevelForm } from "./add-grade-level-form";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ const K12_NAMES = [
 export default async function CurriculumPage() {
   const user = await requireModule("curriculum");
   const admin = isAdmin(user);
-  const [levels, subjectCounts] = await Promise.all([listGradeLevels(), countSubjects()]);
+  const [levels, subjectCounts] = await Promise.all([listGradeLevels(), countSubjectsByGrade()]);
   const existing = new Set(levels.map((l) => l.name));
 
   return (

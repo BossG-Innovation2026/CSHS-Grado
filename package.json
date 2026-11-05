@@ -1,5 +1,5 @@
 {
-  "name": "shs-app",
+  "name": "grado",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,32 +7,49 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:migrate": "node scripts/migrate.mjs",
-    "db:seed": "node scripts/seed.mjs",
-    "deploy": "opennextjs-cloudflare build && wrangler deploy"
+    "typecheck": "next typegen && tsc --noEmit",
+    "check": "npm run typecheck && npm run lint",
+    "db:dev": "node scripts/dev-db.mjs",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node --env-file-if-exists=.env.local node_modules/drizzle-kit/bin.cjs migrate",
+    "db:studio": "node --env-file-if-exists=.env.local node_modules/drizzle-kit/bin.cjs studio",
+    "db:seed-dev": "node --env-file-if-exists=.env.local scripts/seed-dev.mjs",
+    "db:import-d1": "node --env-file-if-exists=.env.local scripts/import-d1.mjs",
+    "admin:promote": "node --env-file-if-exists=.env.local scripts/promote-super-admin.mjs",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
   },
   "dependencies": {
     "better-auth": "^1.6.26",
+    "drizzle-orm": "^0.45.4",
     "lucide-react": "^1.31.0",
     "next": "16.3.0",
+    "pg": "^8.23.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "xlsx": "^0.18.5"
+    "server-only": "^0.0.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260810.1",
+    "@electric-sql/pglite": "^0.5.15",
+    "@electric-sql/pglite-socket": "^0.2.18",
     "@opennextjs/cloudflare": "^1.20.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^24.13.3",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.11",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
-    "libsodium-wrappers": "^0.8.4",
     "playwright": "^1.62.1",
     "tailwindcss": "^4",
     "typescript": "^5",
     "workerd": "1.20260804.1",
     "wrangler": "^4.120.1"
+  },
+  "engines": {
+    "node": ">=22.12"
   }
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireModule } from "@/lib/access";
-import { listClasses } from "./actions";
+import { listClasses } from "@/server/classes";
 
 export const dynamic = "force-dynamic";
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireModule } from "@/lib/access";
-import { listClasses, listGradeLevels } from "../actions";
+import { countClassesByGrade, listGradeLevelsForClasses } from "@/server/classes";
 import { CreateClassForm, type CreateClassData } from "../create-class-form";
 
 export const dynamic = "force-dynamic";
@@ -8,12 +8,10 @@ export const dynamic = "force-dynamic";
 export default async function NewClassPage() {
   await requireModule("classes");
 
-  const [gradeLevels, classes] = await Promise.all([listGradeLevels(), listClasses()]);
-
-  const classCounts: Record<string, number> = {};
-  for (const c of classes) {
-    classCounts[c.gradeLevelId] = (classCounts[c.gradeLevelId] ?? 0) + 1;
-  }
+  const [gradeLevels, classCounts] = await Promise.all([
+    listGradeLevelsForClasses(),
+    countClassesByGrade(),
+  ]);
 
   const data: CreateClassData = { gradeLevels, classCounts };
 

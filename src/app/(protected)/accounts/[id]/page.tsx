@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAdmin, ROLE_LABELS } from "@/lib/access";
-import { getAccount } from "../actions";
+import { getAccount } from "@/server/accounts";
 import { EditAccountForm } from "../edit-account-form";
 
 export const dynamic = "force-dynamic";

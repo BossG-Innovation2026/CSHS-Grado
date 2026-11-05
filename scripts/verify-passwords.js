@@ -1,10 +1,10 @@
 // E2E verification of password-confirmed actions on the class detail page.
-// Prereqs: dev server on localhost:3000, seeded DB (node scripts/seed-dev.js).
+// Prereqs: dev server on localhost:3000, seeded DB (npm run db:seed-dev).
 // Usage: node scripts/verify-passwords.js
 // Env overrides: APP_BASE_URL, TEST_EMAIL, TEST_PASSWORD.
 // Expect: 1-9 all OK, "JS failures: none".
 const { chromium } = require("playwright");
-const { DatabaseSync } = require("node:sqlite");
+const { execFileSync } = require("node:child_process");
 
 const BASE = process.env.APP_BASE_URL || "http://localhost:3000";
 const EMAIL = process.env.TEST_EMAIL || "repro2@school.local";
@@ -27,21 +27,11 @@ const CLASS_ID = "22222222-3333-4444-5555-666666666666";
   await page.waitForURL("**/login**", { timeout: 15000 }).catch(() => {});
   console.log("registered:", page.url());
 
-  // ensure role/permissions/subjects/class (mirrors scripts/seed-dev.js)
-  const db = new DatabaseSync("dev.sqlite");
-  const me = db.prepare("SELECT id FROM user WHERE email = ?").get(EMAIL);
-  db.prepare("UPDATE user SET role = 'teacher', permissions = ? WHERE id = ?").run(JSON.stringify(["classes", "curriculum"]), me.id);
-  for (const [id, code, title] of [["sub-a", "OC11", "Oral Communication"], ["sub-b", "GM11", "General Mathematics"], ["sub-c", "ES11", "Earth and Life Science"]]) {
-    db.prepare("INSERT OR REPLACE INTO subject (id, gradeLevelId, code, title, createdAt) VALUES (?, 'grade-11', ?, ?, ?)").run(id, code, title, Date.now());
-  }
-  db.prepare("DELETE FROM enrollment WHERE classId = ?").run(CLASS_ID);
-  db.prepare("DELETE FROM class_subject WHERE classId = ?").run(CLASS_ID);
-  db.prepare("DELETE FROM class WHERE id = ?").run(CLASS_ID);
-  db.prepare("INSERT INTO class (id, name, gradeLevelId, adviserId, createdAt) VALUES (?, 'Grade 11 - B', 'grade-11', ?, ?)").run(CLASS_ID, me.id, Date.now());
-  db.prepare("INSERT INTO class_subject (id, classId, subjectId, code, title, description, teacherId, term, createdAt) VALUES ('cs-a', ?, 'sub-a', 'OC11', 'Oral Communication', '', NULL, 1, ?)").run(CLASS_ID, Date.now());
-  db.prepare("INSERT INTO class_subject (id, classId, subjectId, code, title, description, teacherId, term, createdAt) VALUES ('cs-b', ?, 'sub-b', 'GM11', 'General Mathematics', '', NULL, 1, ?)").run(CLASS_ID, Date.now());
-  db.close();
-  console.log("seeded class + subjects + 2 class_subject rows");
+  // ensure role/permissions/subjects/class (scripts/seed-dev.mjs)
+  execFileSync(process.execPath, ["--env-file-if-exists=.env.local", "scripts/seed-dev.mjs"], {
+    stdio: "inherit",
+    env: { ...process.env, SEED_EMAIL: EMAIL, SEED_PASSWORD: PASSWORD },
+  });
 
   // login
   await page.goto(BASE + "/login");
@@ -89,6 +79,7 @@ const CLASS_ID = "22222222-3333-4444-5555-666666666666";
     };
   });
   const ocRow = page.locator("tbody tr", { hasText: "Oral Communication" });
+  const myId = await ocRow.locator('select[name="teacherId"] option', { hasText: "Repro Two" }).getAttribute("value");
   await ocRow.locator('select[name="teacherId"]').selectOption({ label: "Repro Two" });
   await page.getByRole("dialog").waitFor({ state: "visible", timeout: 5000 }).catch(() => failures.push("teacher: no modal"));
   await confirmPassword(PASSWORD);
@@ -98,7 +89,7 @@ const CLASS_ID = "22222222-3333-4444-5555-666666666666";
       const row = rows.find((r) => r.textContent.includes("Oral Communication"));
       return row && row.querySelector('select[name="teacherId"]')?.value === id;
     },
-    me.id, { timeout: 10000 }
+    myId, { timeout: 10000 }
   ).then(() => true).catch(() => false);
   const logs3 = await page.evaluate(() => window.__logs);
   console.log("3. teacher assign ->", assigned ? "OK" : "FAIL");
@@ -111,9 +102,6 @@ const CLASS_ID = "22222222-3333-4444-5555-666666666666";
     console.log("   all after reload:", await page.locator('select[name="teacherId"]').evaluateAll((els) => els.map((e) => e.value)));
     console.log("   EVENT LOG:\n   " + logs3.join("\n   "));
     console.log("   dialog count:", await page.getByRole("dialog").count());
-    const db3 = new DatabaseSync("dev.sqlite", { readOnly: true });
-    console.log("   DB:", JSON.stringify(db3.prepare("SELECT id, teacherId FROM class_subject WHERE classId = ?").all(CLASS_ID)));
-    db3.close();
   }
 
   // 4. add subject

@@ -1,3 +1,5 @@
+> **Historical note (2026-11-06):** this describes the old SQLite/D1 setup. The app now uses Postgres + Drizzle; see `docs/architecture.md` and `README.md`. Commands below no longer apply.
+
 # Session History — 2026-08-16 (Password Confirmation)
 
 Resume point for future sessions. Tell the agent:
