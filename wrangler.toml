@@ -37,7 +37,7 @@ name = "grado-demo"
 
 [[env.demo.hyperdrive]]
 binding = "HYPERDRIVE"
-id = "REPLACE_WITH_DEMO_HYPERDRIVE_ID"
+id = "2d8c7aafcdf74eb9b87d35c2ffb11bee"
 localConnectionString = "postgres://postgres:postgres@127.0.0.1:5432/postgres"
 
 [env.demo.vars]
