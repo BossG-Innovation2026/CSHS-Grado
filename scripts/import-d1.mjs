@@ -55,11 +55,14 @@ const tableExists = (name) =>
 const columnsOf = (name) => new Set(sqlite.prepare(`PRAGMA table_info("${name}")`).all().map((c) => c.name));
 const rowsOf = (name) => (tableExists(name) ? sqlite.prepare(`SELECT * FROM "${name}"`).all() : []);
 
+/** Old D1 role names -> current role model (see src/lib/modules.ts). */
+const ROLE_MAP = { super_admin: "system_admin", admin: "system_admin", coordinator: "department_head" };
+
 /** Tables in foreign-key order: [source table, target table, row mapper]. */
 const PLAN = [
   ["user", "user", (r) => ({
     id: r.id, name: r.name, email: r.email, email_verified: bool(r.emailVerified), image: r.image ?? null,
-    created_at: msReq(r.createdAt), updated_at: msReq(r.updatedAt), role: r.role ?? "teacher",
+    created_at: msReq(r.createdAt), updated_at: msReq(r.updatedAt), role: ROLE_MAP[r.role] ?? r.role ?? "teacher",
     permissions: r.permissions ?? "[]", active: r.active === undefined ? true : bool(r.active),
   })],
   ["account", "account", (r) => ({

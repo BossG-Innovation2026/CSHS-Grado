@@ -20,7 +20,7 @@ export interface ActionState {
   ok?: boolean;
 }
 
-const NO_ACCESS: ActionState = { error: "You are not signed in or do not have access to Class Creation." };
+const NO_ACCESS: ActionState = { error: "You are not signed in or do not have access to Classes." };
 const NOT_ADVISER: ActionState = { error: "You can only manage classes you advise." };
 
 /** Signed in + module access + manages the class + re-entered password. */

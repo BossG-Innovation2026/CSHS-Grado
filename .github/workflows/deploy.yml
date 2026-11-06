@@ -58,3 +58,44 @@ jobs:
             BETTER_AUTH_SECRET
         env:
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+
+      # ---- Demo site (grado-demo): same build, fake-data database ----------
+      - name: Is the demo site configured?
+        id: demo
+        env:
+          DATABASE_URL_DEMO: ${{ secrets.DATABASE_URL_DEMO }}
+        run: |
+          if [ -n "$DATABASE_URL_DEMO" ] && ! grep -q "REPLACE_WITH_DEMO_HYPERDRIVE_ID" wrangler.toml; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Demo site not configured (run scripts/go-live-demo.mjs); skipping."
+          fi
+
+      - name: Apply database migrations (demo)
+        if: steps.demo.outputs.enabled == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_DEMO }}
+        run: npm run db:migrate
+
+      - name: Deploy demo Worker
+        if: steps.demo.outputs.enabled == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          command: deploy --env demo
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Demo auth secret (set once)
+        if: steps.demo.outputs.enabled == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BETTER_AUTH_SECRET_DEMO: ${{ secrets.BETTER_AUTH_SECRET_DEMO }}
+        run: |
+          if npx wrangler secret list --env demo | grep -q BETTER_AUTH_SECRET; then
+            echo "Demo auth secret already set."
+          else
+            node -e 'process.stdout.write(JSON.stringify({ BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET_DEMO }))' \
+              | npx wrangler secret bulk --env demo
+          fi

@@ -25,10 +25,8 @@ export default async function AccountDetailPage({
   }
 
   const editingSelf = user.id === account.id;
-  const canEdit =
-    user.role === "super_admin" ||
-    (user.role === "admin" && account.role !== "admin" && account.role !== "super_admin") ||
-    editingSelf;
+  // requireAdmin() above: only System Admins reach this page, and they manage every account.
+  const canEdit = true;
 
   return (
     <div className="max-w-2xl">
@@ -57,8 +55,8 @@ export default async function AccountDetailPage({
 
       {editingSelf && (
         <p className="mt-4 rounded-md bg-accent-soft px-3 py-2 text-sm text-foreground">
-          This is your own account. You can add or remove modules (except Account Management),
-          change your password, and update your status.
+          This is your own account. As a System Admin you always have every module; you can
+          change your password here. Another System Admin can deactivate it if needed.
         </p>
       )}
 

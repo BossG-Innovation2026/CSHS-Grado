@@ -17,10 +17,3 @@ export async function requireAdmin(): Promise<SessionUser> {
   if (!isAdmin(user)) redirect("/dashboard");
   return user;
 }
-
-export async function requireSuperAdmin(): Promise<SessionUser> {
-  const user = await getSessionUser();
-  if (!user) redirect("/login");
-  if (user.role !== "super_admin") redirect("/dashboard");
-  return user;
-}

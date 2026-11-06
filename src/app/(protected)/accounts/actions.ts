@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { hashPassword } from "better-auth/crypto";
 import { getDb, schema } from "@/db";
-import { MODULES, ROLE_ADMIN, ROLE_SUPER_ADMIN, rolesCreatableBy, type ModuleKey } from "@/lib/modules";
+import { MODULES, ROLE_SYSTEM_ADMIN, rolesCreatableBy, type ModuleKey } from "@/lib/modules";
 import { adminUser } from "@/server/guards";
 import { findAccount } from "@/server/accounts";
 
@@ -46,8 +46,8 @@ export async function createAccount(_prev: ActionState, formData: FormData): Pro
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "Enter a valid email address." };
   if (password.length < 8) return { error: "Password must be at least 8 characters." };
 
-  const modules = parseModules(formData);
-  if (role === ROLE_ADMIN && !modules.includes("accounts")) modules.push("accounts");
+  // System Admins always have every module; for other roles the ticked boxes apply.
+  const modules = role === ROLE_SYSTEM_ADMIN ? MODULES.map((m) => m.key) : parseModules(formData);
 
   const passwordHash = await hashPassword(password);
   const id = randomUUID();
@@ -75,17 +75,11 @@ export async function updatePermissions(id: string, _prev: ActionState, formData
   const target = await findAccount(id);
   if (!target) return { error: "Account not found." };
 
-  const editingSelf = actor.id === id;
-  const canManageAdmin = actor.role === ROLE_SUPER_ADMIN;
-  if (target.role === ROLE_ADMIN && !editingSelf && !canManageAdmin) {
-    return { error: "Only the super admin can manage admin accounts." };
-  }
-  if (target.role === ROLE_SUPER_ADMIN && !canManageAdmin) {
-    return { error: "Only the super admin can manage this account." };
+  if (target.role === ROLE_SYSTEM_ADMIN) {
+    return { error: "System Admins always have every module." };
   }
 
   const modules = parseModules(formData);
-  if (editingSelf && !modules.includes("accounts")) modules.push("accounts");
 
   await getDb().update(user).set({ permissions: JSON.stringify(modules) }).where(eq(user.id, id));
   revalidateAccount(id);
@@ -97,14 +91,6 @@ export async function resetPassword(id: string, _prev: ActionState, formData: Fo
   if (!actor) return { error: "You are not authorized." };
   const target = await findAccount(id);
   if (!target) return { error: "Account not found." };
-
-  const canManageAdmin = actor.role === ROLE_SUPER_ADMIN;
-  if (target.role === ROLE_ADMIN && actor.id !== id && !canManageAdmin) {
-    return { error: "Only the super admin can manage admin accounts." };
-  }
-  if (target.role === ROLE_SUPER_ADMIN && actor.id !== id) {
-    return { error: "Only the super admin can manage this account." };
-  }
 
   const password = String(formData.get("password") ?? "");
   if (password.length < 8) return { error: "Password must be at least 8 characters." };
@@ -123,13 +109,8 @@ export async function setActive(id: string, _prev: ActionState, formData: FormDa
   const target = await findAccount(id);
   if (!target) return { error: "Account not found." };
 
+  // You cannot lock yourself out, so at least one System Admin always stays active.
   if (actor.id === id) return { error: "You cannot deactivate your own account." };
-  if (target.role === ROLE_ADMIN && actor.role !== ROLE_SUPER_ADMIN) {
-    return { error: "Only the super admin can manage admin accounts." };
-  }
-  if (target.role === ROLE_SUPER_ADMIN) {
-    return { error: "The super admin account cannot be deactivated." };
-  }
 
   const active = formData.get("active") === "1";
   await getDb().update(user).set({ active, updatedAt: new Date() }).where(eq(user.id, id));

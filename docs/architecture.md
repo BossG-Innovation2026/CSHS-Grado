@@ -74,6 +74,16 @@ D1 free, for comparison: 500 MB per database and 50 queries per request.
 5. **Read scaling** — Neon read replicas for reports/analytics; cache only truly static
    reference data (grade levels, curriculum) in a separate cached Hyperdrive config.
 
+## Environments
+
+| Site | Worker | Database | Notes |
+|------|--------|----------|-------|
+| Production | `shs-grades` | Neon `delicate-credit-87024053`, branch `production` | Real school data |
+| Demo | `grado-demo` (`wrangler --env demo`) | Separate Neon project `grado-demo` | Fake data, `DEMO_MODE=true`, one-click role logins |
+
+Both deploy from `main` in one workflow run; the demo steps are skipped until
+`DATABASE_URL_DEMO` and the demo Hyperdrive id exist.
+
 ## Code layout and rules
 
 - `src/db/schema.ts` — tables. Change it, run `npm run db:generate`, commit `drizzle/`.

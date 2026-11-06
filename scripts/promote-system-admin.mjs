@@ -1,4 +1,4 @@
-// Promote an existing account to Super Admin (all modules).
+// Promote an existing account to System Admin (all modules).
 // Replaces the old public /api/admin/seed endpoint: this runs only on an
 // operator's machine with direct database access.
 // Usage: DATABASE_URL=... npm run admin:promote -- someone@school.edu.ph
@@ -18,7 +18,7 @@ const client = new pg.Client({ connectionString: url });
 await client.connect();
 try {
   const result = await client.query(
-    `UPDATE "user" SET role = 'super_admin', permissions = $1, active = true, updated_at = now()
+    `UPDATE "user" SET role = 'system_admin', permissions = $1, active = true, updated_at = now()
      WHERE email = $2 RETURNING id`,
     [JSON.stringify(ALL_MODULES), email]
   );
@@ -26,7 +26,7 @@ try {
     console.error(`No account with email ${email}.`);
     process.exitCode = 1;
   } else {
-    console.log(`${email} is now Super Admin.`);
+    console.log(`${email} is now System Admin.`);
   }
 } finally {
   await client.end();

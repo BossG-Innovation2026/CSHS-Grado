@@ -1,13 +1,17 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { createAccount, type ActionState } from "./actions";
 import { ModuleCheckboxes } from "@/components/module-checkboxes";
 import { PasswordInput } from "@/components/password-input";
-import { ROLE_LABELS } from "@/lib/modules";
+import { MODULES, ROLE_DEFAULT_MODULES, ROLE_LABELS, ROLE_SYSTEM_ADMIN } from "@/lib/modules";
+
+const ALL_MODULES = MODULES.map((m) => m.key);
 
 export function CreateAccountForm({ roleOptions }: { roleOptions: string[] }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(createAccount, {});
+  const [role, setRole] = useState(roleOptions[0]);
+  const isSystemAdmin = role === ROLE_SYSTEM_ADMIN;
 
   return (
     <form action={action} className="max-w-xl space-y-5">
@@ -46,7 +50,8 @@ export function CreateAccountForm({ roleOptions }: { roleOptions: string[] }) {
           <select
             id="role"
             name="role"
-            defaultValue={roleOptions[0]}
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
             className="w-full rounded-md border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none"
           >
             {roleOptions.map((r) => (
@@ -71,7 +76,17 @@ export function CreateAccountForm({ roleOptions }: { roleOptions: string[] }) {
       </div>
       <div>
         <p className="mb-2 text-sm font-medium text-foreground">Modules this account can access</p>
-        <ModuleCheckboxes value={[]} />
+        <p className="mb-2 text-xs text-muted">
+          {isSystemAdmin
+            ? "System Admins always have every module."
+            : "Pre-ticked for this role. Add or remove any module."}
+        </p>
+        {/* key: re-apply the role's defaults whenever the role changes */}
+        <ModuleCheckboxes
+          key={role}
+          value={isSystemAdmin ? ALL_MODULES : (ROLE_DEFAULT_MODULES[role] ?? [])}
+          locked={isSystemAdmin ? ALL_MODULES : []}
+        />
       </div>
       {state.error && (
         <p className="rounded-md bg-accent-soft px-3 py-2 text-sm text-foreground">{state.error}</p>
