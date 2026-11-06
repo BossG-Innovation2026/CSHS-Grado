@@ -10,7 +10,7 @@ import {
 } from "./actions";
 import { ModuleCheckboxes } from "@/components/module-checkboxes";
 import { PasswordInput } from "@/components/password-input";
-import { parsePermissions, MODULES } from "@/lib/modules";
+import { parsePermissions, MODULES, ROLE_SYSTEM_ADMIN } from "@/lib/modules";
 
 const MODULE_KEYS = MODULES.map((m) => m.key);
 
@@ -46,7 +46,9 @@ export function EditAccountForm({
     {}
   );
 
-  const locked = editingSelf ? ["accounts"] : [];
+  // System Admins always have every module, so their boxes are all locked on.
+  const isSystemAdmin = account.role === ROLE_SYSTEM_ADMIN;
+  const locked = isSystemAdmin ? MODULE_KEYS : editingSelf ? ["accounts"] : [];
   const disabled = !canEdit ? MODULE_KEYS : [];
 
   return (
@@ -55,13 +57,16 @@ export function EditAccountForm({
         <h2 className="text-sm font-semibold text-foreground">Modules</h2>
         {!canEdit && (
           <p className="mt-1 text-xs text-muted">
-            Only the super admin can manage this account.
+            Only a System Admin can manage this account.
           </p>
         )}
         <form action={permAction} className="mt-3 space-y-3">
-          <ModuleCheckboxes value={parsePermissions(account.permissions)} locked={locked} disabled={disabled} />
+          <ModuleCheckboxes value={isSystemAdmin ? MODULE_KEYS : parsePermissions(account.permissions)} locked={locked} disabled={disabled} />
           <Notice state={permState} />
-          {canEdit && (
+          {isSystemAdmin && (
+            <p className="text-xs text-muted">System Admins always have every module.</p>
+          )}
+          {canEdit && !isSystemAdmin && (
             <button
               type="submit"
               disabled={permPending}
@@ -108,7 +113,7 @@ export function EditAccountForm({
         <h2 className="text-sm font-semibold text-foreground">Account status</h2>
         <form action={activeAction} className="mt-3">
           <input type="hidden" name="active" value={account.active ? 0 : 1} />
-          {canEdit && !editingSelf && account.role !== "super_admin" ? (
+          {canEdit && !editingSelf ? (
             <button
               type="submit"
               disabled={activePending}

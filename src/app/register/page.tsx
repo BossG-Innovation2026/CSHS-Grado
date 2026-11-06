@@ -16,7 +16,7 @@ export default function RegisterPage() {
             Project Grado
           </span>
           <h1 className="mt-3 text-xl font-bold text-foreground">Create your account</h1>
-          <p className="mt-1 text-sm text-muted">The first account on this system becomes the Super Admin.</p>
+          <p className="mt-1 text-sm text-muted">The first account on this system becomes the System Admin.</p>
         </div>
         <form action={action} className="mt-6 space-y-4">
           <div>

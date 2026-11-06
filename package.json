@@ -15,7 +15,7 @@
     "db:studio": "node --env-file-if-exists=.env.local node_modules/drizzle-kit/bin.cjs studio",
     "db:seed-dev": "node --env-file-if-exists=.env.local scripts/seed-dev.mjs",
     "db:import-d1": "node --env-file-if-exists=.env.local scripts/import-d1.mjs",
-    "admin:promote": "node --env-file-if-exists=.env.local scripts/promote-super-admin.mjs",
+    "admin:promote": "node --env-file-if-exists=.env.local scripts/promote-system-admin.mjs",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "db:seed-demo": "node --env-file-if-exists=.env.local scripts/seed-demo.mjs"

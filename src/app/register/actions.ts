@@ -27,13 +27,13 @@ export async function registerAccount(_prev: RegisterState, formData: FormData):
   }
 
   // New accounts start as teachers with no modules. The very first account
-  // becomes Super Admin; the NOT EXISTS check makes this a single atomic step,
-  // so two people registering at once cannot both become Super Admin.
+  // becomes System Admin; the NOT EXISTS check makes this a single atomic step,
+  // so two people registering at once cannot both become System Admin.
   await getDb()
     .update(user)
-    .set({ role: "super_admin" })
+    .set({ role: "system_admin" })
     .where(
-      sql`${eq(user.email, email)} AND NOT EXISTS (SELECT 1 FROM ${user} AS u WHERE u.role = 'super_admin')`
+      sql`${eq(user.email, email)} AND NOT EXISTS (SELECT 1 FROM ${user} AS u WHERE u.role = 'system_admin')`
     );
 
   redirect("/login?registered=1");

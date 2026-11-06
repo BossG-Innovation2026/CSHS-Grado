@@ -24,7 +24,13 @@ function RegisteredNote() {
   );
 }
 
-export function LoginForm({ demoLogins }: { demoLogins: DemoLogin[] }) {
+export function LoginForm({
+  demoLogins,
+  studentParentNote,
+}: {
+  demoLogins: DemoLogin[];
+  studentParentNote: string | null;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -118,16 +124,16 @@ export function LoginForm({ demoLogins }: { demoLogins: DemoLogin[] }) {
             </p>
             <ul className="mt-3 space-y-2">
               {demoLogins.map((d) => (
-                <li key={d.role}>
+                <li key={d.email}>
                   <button
                     type="button"
                     disabled={loading !== null}
-                    onClick={() => void signIn(d.email, d.password, d.role)}
+                    onClick={() => void signIn(d.email, d.password, d.email)}
                     className="flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-left hover:bg-panel-hover disabled:opacity-50"
                   >
                     <span>
                       <span className="block text-sm font-medium text-foreground">
-                        {loading === d.role ? "Signing in…" : `Sign in as ${d.roleLabel}`}
+                        {loading === d.email ? "Signing in…" : `Sign in as ${d.roleLabel}`}
                       </span>
                       <span className="block text-xs text-muted">
                         {d.email} · {d.summary}
@@ -138,6 +144,11 @@ export function LoginForm({ demoLogins }: { demoLogins: DemoLogin[] }) {
                 </li>
               ))}
             </ul>
+            {studentParentNote && (
+              <p className="mt-3 rounded-md bg-panel px-3 py-2 text-xs text-muted">
+                <span className="font-medium text-foreground">Student / Parent:</span> {studentParentNote}
+              </p>
+            )}
           </section>
         )}
       </div>

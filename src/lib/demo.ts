@@ -1,7 +1,6 @@
 import "server-only";
 import { getEnvVar } from "@/lib/env";
 import demo from "@/demo/accounts.json";
-import { ROLE_LABELS } from "@/lib/modules";
 
 export interface DemoAccount {
   role: string;
@@ -24,9 +23,14 @@ export function demoAccounts(): DemoAccount[] {
   if (!isDemoMode()) return [];
   return demo.accounts.map((a) => ({
     role: a.role,
-    roleLabel: ROLE_LABELS[a.role] ?? a.role,
+    roleLabel: a.label,
     email: a.email,
     password: demo.password,
     summary: a.summary,
   }));
+}
+
+/** How students and parents get in (shown on the demo login page). */
+export function demoStudentParentNote(): string | null {
+  return isDemoMode() ? demo.studentParent : null;
 }

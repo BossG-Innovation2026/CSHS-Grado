@@ -62,7 +62,11 @@ try {
   // Accounts: one per role, same demo password.
   const passwordHash = await hashPassword(demo.password);
   const ids = {};
-  for (const a of demo.accounts) {
+  const everyone = [
+    ...demo.accounts,
+    ...demo.extraTeachers.map((t) => ({ ...t, role: "teacher", permissions: ["classes", "grades_submit", "codes"] })),
+  ];
+  for (const a of everyone) {
     if (!a.email.endsWith(DOMAIN)) throw new Error(`Demo account ${a.email} must use ${DOMAIN}`);
     const saved = await client.query(
       `INSERT INTO "user" (id, name, email, email_verified, role, permissions, active)
@@ -73,7 +77,7 @@ try {
       [randomUUID(), a.name, a.email, a.role, JSON.stringify(a.permissions)]
     );
     const userId = saved.rows[0].id;
-    ids[a.role] = userId;
+    ids[a.email] = userId;
     await client.query(`DELETE FROM account WHERE user_id = $1 AND provider_id = 'credential'`, [userId]);
     await client.query(
       `INSERT INTO account (id, account_id, provider_id, user_id, password) VALUES ($1, $2, 'credential', $2, $3)`,
@@ -95,9 +99,14 @@ try {
   }
 
   // Classes, their Term 1 subjects and fake students.
+  // Grade 11 - A: the Class Adviser also teaches some of its subjects.
+  // Grade 12 - A: advised by Reyes; the Subject Teacher teaches in both classes.
+  const adviser = ids["adviser@demo.grado"];
+  const subjectTeacher = ids["teacher@demo.grado"];
+  const reyes = ids["reyes@demo.grado"];
   const classes = [
-    { grade: "grade-11", name: "Grade 11 - A", adviser: ids.teacher, students: 20, lrnBase: 900000000100 },
-    { grade: "grade-12", name: "Grade 12 - A", adviser: ids.admin, students: 15, lrnBase: 900000000200 },
+    { grade: "grade-11", name: "Grade 11 - A", adviser, teachers: [adviser, subjectTeacher], students: 20, lrnBase: 900000000100 },
+    { grade: "grade-12", name: "Grade 12 - A", adviser: reyes, teachers: [subjectTeacher, reyes], students: 15, lrnBase: 900000000200 },
   ];
   let studentCount = 0;
   for (const c of classes) {
@@ -111,7 +120,7 @@ try {
       await client.query(
         `INSERT INTO class_subject (id, class_id, subject_id, code, title, teacher_id, term)
          VALUES ($1, $2, $3, $4, $5, $6, 1) ON CONFLICT (class_id, code, term) DO NOTHING`,
-        [randomUUID(), classId, subjectIds[`${c.grade}:${code}`], code, title, i % 2 === 0 ? ids.teacher : null]
+        [randomUUID(), classId, subjectIds[`${c.grade}:${code}`], code, title, c.teachers[i % 2]]
       );
     }
     for (let i = 0; i < c.students; i++) {
@@ -130,7 +139,7 @@ try {
   }
 
   await client.query("COMMIT");
-  console.log(`Demo data ready: ${demo.accounts.length} accounts (password ${demo.password}), ` +
+  console.log(`Demo data ready: ${everyone.length} accounts (password ${demo.password}), ` +
     `${Object.values(SUBJECTS).flat().length} subjects, ${classes.length} classes, ${studentCount} fake students.`);
 } catch (error) {
   await client.query("ROLLBACK").catch(() => {});

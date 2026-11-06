@@ -2,39 +2,60 @@
   "password": "DemoPass2026!",
   "accounts": [
     {
-      "role": "super_admin",
-      "name": "Demo Super Admin",
-      "email": "superadmin@demo.grado",
-      "permissions": ["accounts", "curriculum", "classes", "grades_submit", "grades_approve", "registrar", "codes"],
-      "summary": "Everything, including managing admins"
+      "role": "system_admin",
+      "label": "System Admin",
+      "name": "Demo System Admin",
+      "email": "sysadmin@demo.grado",
+      "permissions": [],
+      "summary": "Sets up grade levels, subjects, classes and accounts"
     },
     {
-      "role": "admin",
-      "name": "Demo Admin",
-      "email": "admin@demo.grado",
-      "permissions": ["accounts", "curriculum", "classes"],
-      "summary": "Accounts, curriculum and all classes"
+      "role": "school_head",
+      "label": "School Head",
+      "name": "Demo School Head",
+      "email": "schoolhead@demo.grado",
+      "permissions": ["classes", "curriculum", "grades_approve"],
+      "summary": "School-wide overview and grade approval"
     },
     {
-      "role": "teacher",
-      "name": "Demo Teacher",
-      "email": "teacher@demo.grado",
-      "permissions": ["classes"],
-      "summary": "Advises Grade 11 - A; teaches its subjects"
+      "role": "department_head",
+      "label": "Department Head",
+      "name": "Demo Department Head",
+      "email": "depthead@demo.grado",
+      "permissions": ["classes", "grades_approve"],
+      "summary": "Assigned classes and grade approval"
     },
     {
       "role": "registrar",
+      "label": "Registrar",
       "name": "Demo Registrar",
       "email": "registrar@demo.grado",
-      "permissions": ["registrar", "classes"],
-      "summary": "Views classes and students"
+      "permissions": ["classes", "registrar"],
+      "summary": "Student records and forms (SF9/SF10)"
     },
     {
-      "role": "coordinator",
-      "name": "Demo Coordinator",
-      "email": "coordinator@demo.grado",
-      "permissions": ["curriculum", "classes", "grades_approve"],
-      "summary": "Views curriculum and classes"
+      "role": "teacher",
+      "label": "Teacher (Class Adviser)",
+      "name": "Demo Class Adviser",
+      "email": "adviser@demo.grado",
+      "permissions": ["classes", "grades_submit", "codes"],
+      "summary": "Adviser of Grade 11 - A; also teaches subjects"
+    },
+    {
+      "role": "teacher",
+      "label": "Teacher (Subject Teacher)",
+      "name": "Demo Subject Teacher",
+      "email": "teacher@demo.grado",
+      "permissions": ["classes", "grades_submit"],
+      "summary": "Teaches subjects in Grade 11 - A and Grade 12 - A"
     }
-  ]
+  ],
+  "extraTeachers": [
+    {
+      "name": "Demo Adviser Reyes",
+      "email": "reyes@demo.grado",
+      "summary": "Adviser of Grade 12 - A (no one-click button)"
+    }
+  ],
+  "studentParent": "Students and parents view grades with a voucher code from the class adviser (coming with the grades module)."
 }
