@@ -8,6 +8,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
+## Start here
+
+Read `docs/PROJECT_CONTEXT.md` first: what Grado is, live environments, roles, data
+model, conventions, delivery pipeline, the next feature and its open questions, and
+security rules. Keep it updated when you change something it describes.
+
 ## Project memory (Knowledge OS)
 
 Project memory and handoff notes for this project live outside the repo at:
