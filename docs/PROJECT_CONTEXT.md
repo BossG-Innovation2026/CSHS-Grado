@@ -1,6 +1,6 @@
 # Project Grado — context for anyone (human or AI) continuing the work
 
-Last updated: 2026-11-06. Read this file first, then `docs/architecture.md` (why the
+Last updated: 2026-11-08. Read this file first, then `docs/architecture.md` (why the
 stack is what it is) and `README.md` (commands). Keep this file current when you change
 something it describes.
 
@@ -35,7 +35,7 @@ will view approved grades with a voucher code.
 
 ## 3. Stack
 
-- Next.js **16.3** (App Router) + React 19 + Tailwind 4. **Next 16 differs from older
+- Next.js **16.4** (App Router) + React 19 + Tailwind 4. **Next 16 differs from older
   versions** — read `node_modules/next/dist/docs/` before writing Next code (AGENTS.md).
 - Hosting: Cloudflare Workers via OpenNext (`@opennextjs/cloudflare`). Free plan limits:
   10 ms CPU/request, 3 MB compressed Worker (currently ~2.2 MB), 100k requests/day.
@@ -67,9 +67,16 @@ show as "SOON" in the sidebar (`NAV_LINKS.implemented`).
 
 Rules: only System Admins manage accounts and curriculum; any System Admin manages every
 account; nobody can deactivate themselves (so one System Admin always remains); the first
-account ever registered becomes System Admin (atomic). Class changes require class
+account ever registered becomes System Admin (atomic), then `/register` and better-auth
+sign-up stay closed and System Admins create accounts. Class changes require class
 adviser (or System Admin) + re-entering your password. Old role names were migrated
 (`super_admin`/`admin` → `system_admin`, `coordinator` → `department_head`).
+
+Student rosters (`canViewRoster`): School Head, Registrar, Department Head (school-wide
+until classes can be assigned to them), System Admin, the adviser, and that class's subject
+teachers. LRNs must be 12 digits. Changing an existing student's details needs a System
+Admin unless the student is in no other class. Resetting a password ends that account's
+sessions. Deleting a grade level needs the admin's password.
 
 ## 5. Data model (Postgres, `src/db/schema.ts`)
 
@@ -116,8 +123,9 @@ npm run db:seed-dev             # local demo teacher + class (local DBs only)
 npm run dev                     # http://localhost:3000 (port 3000 may be taken on the owner's PC; use --port 3100 and set BETTER_AUTH_URL)
 npm run check                   # typecheck (next typegen + tsc) + eslint
 npm run db:generate             # after editing src/db/schema.ts; commit drizzle/
-node scripts/e2e-m1.js          # E2E accounts/bootstrap (wipes local accounts); 17 checks
+node scripts/e2e-m1.js          # E2E accounts/bootstrap (wipes local accounts); 20 checks
 node scripts/verify-passwords.js  # E2E password-confirmed class changes; 9 steps
+node scripts/e2e-records.js     # E2E student records, rosters, grade-level delete; 11 checks (run after e2e-m1)
 ```
 
 E2E needs `npx playwright install --only-shell chromium` and the app running
@@ -126,7 +134,7 @@ E2E needs `npx playwright install --only-shell chromium` and the app running
 ## 8. Delivery pipeline
 
 - Work on a branch → PR → CI (`.github/workflows/ci.yml`: typecheck, lint, Worker build,
-  migration-drift check, both E2E suites on Postgres 17).
+  migration-drift check, all three E2E suites on Postgres 17).
 - Merge to `main` = **production deploy** (`deploy.yml`): checks → OpenNext build →
   migrations on Neon production → `wrangler deploy` → migrations on demo DB → deploy demo
   Worker → set demo auth secret once. Ask the owner before merging.

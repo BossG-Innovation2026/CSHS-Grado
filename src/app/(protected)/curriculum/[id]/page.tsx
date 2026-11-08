@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { requireModule } from "@/lib/access";
 import { isAdmin } from "@/lib/access";
-import { deleteGradeLevel, deleteSubject } from "../actions";
+import { deleteSubject } from "../actions";
 import { getGradeLevel, listSubjects } from "@/server/curriculum";
+import { countClassesByGrade } from "@/server/classes";
 import { AddSubjectForm } from "../add-subject-form";
 import { BulkUploadSubjectsForm } from "../bulk-upload-subjects-form";
+import { DeleteGradeLevelDialog } from "../delete-grade-level-dialog";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +19,12 @@ export default async function GradeLevelDetailPage({
   const { id } = await params;
   const admin = isAdmin(user);
 
-  const [level, subjects] = await Promise.all([getGradeLevel(id), listSubjects(id)]);
+  const [level, subjects, classCounts] = await Promise.all([
+    getGradeLevel(id),
+    listSubjects(id),
+    // Only admins can delete, and only they are sure to have the Classes module.
+    admin ? countClassesByGrade() : Promise.resolve<Record<string, number>>({}),
+  ]);
   if (!level) {
     return (
       <div>
@@ -37,15 +44,12 @@ export default async function GradeLevelDetailPage({
       <div className="mt-2 flex items-center justify-between">
         <h1 className="text-xl font-bold text-foreground">{level.name}</h1>
         {admin && (
-          <form action={deleteGradeLevel}>
-            <input type="hidden" name="id" value={level.id} />
-            <button
-              type="submit"
-              className="rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:bg-panel-hover hover:text-foreground"
-            >
-              Delete grade level
-            </button>
-          </form>
+          <DeleteGradeLevelDialog
+            gradeLevelId={level.id}
+            gradeLevelName={level.name}
+            subjectCount={subjects.length}
+            classCount={classCounts[level.id] ?? 0}
+          />
         )}
       </div>
       <p className="mt-1 text-sm text-muted">Subjects taught in this grade level.</p>

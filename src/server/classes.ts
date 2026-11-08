@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, count, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireModule } from "@/lib/access";
-import { isAdmin } from "@/lib/modules";
+import { isAdmin, ROLE_DEPARTMENT_HEAD, ROLE_REGISTRAR, ROLE_SCHOOL_HEAD } from "@/lib/modules";
 import type { SessionUser } from "@/lib/session";
 
 const { schoolClass, classSubject, gradeLevel, subject, user, student, enrollment } = schema;
@@ -120,8 +120,10 @@ export async function listSubjectsByGrade(
     .orderBy(sql`lower(${subject.title})`);
 }
 
-export async function listStudents(classId: string): Promise<StudentRow[]> {
-  await requireModule("classes");
+/** The class's enrolled students, or null when the caller may not see them. */
+export async function listStudents(classId: string): Promise<StudentRow[] | null> {
+  const actor = await requireModule("classes");
+  if (!(await canViewRoster(actor, classId))) return null;
   return getDb()
     .select({
       id: student.id,
@@ -148,6 +150,22 @@ export async function findClass(id: string): Promise<ClassRow | undefined> {
     .where(eq(schoolClass.id, id))
     .limit(1);
   return row;
+}
+
+/**
+ * Student names and LRNs: school-level staff, the adviser, and the class's
+ * subject teachers. Department Heads are school-level until classes can be
+ * assigned to them (grades workflow).
+ */
+export async function canViewRoster(actor: SessionUser, classId: string): Promise<boolean> {
+  if ([ROLE_SCHOOL_HEAD, ROLE_REGISTRAR, ROLE_DEPARTMENT_HEAD].includes(actor.role)) return true;
+  if (await canManageClass(actor, classId)) return true;
+  const [row] = await getDb()
+    .select({ id: classSubject.id })
+    .from(classSubject)
+    .where(and(eq(classSubject.classId, classId), eq(classSubject.teacherId, actor.id)))
+    .limit(1);
+  return Boolean(row);
 }
 
 /** Admins manage every class; everyone else only the classes they advise. */

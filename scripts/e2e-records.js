@@ -1,0 +1,155 @@
+// E2E: student records stay protected between classes, rosters are restricted,
+// and deleting a grade level needs a password.
+// Prereqs: app running, and scripts/e2e-m1.js already run against the same local
+// database (it creates admin2@school.local).
+// Usage: node scripts/e2e-records.js
+const { chromium } = require("playwright");
+const { randomUUID } = require("node:crypto");
+const pg = require("pg");
+
+try {
+  process.loadEnvFile(".env.local");
+} catch {
+  // CI sets the variables directly.
+}
+
+const BASE = process.env.E2E_BASE ?? "http://localhost:3000";
+const url = process.env.DATABASE_URL;
+if (!url || !/127\.0\.0\.1|localhost/.test(url)) throw new Error("e2e-records only runs against a local database.");
+
+const PASSWORD = "Password123!";
+const STAMP = Date.now();
+// Starts with 9 so it cannot appear inside the class names, which contain STAMP.
+const LRN = `9${String(STAMP).slice(-11)}`;
+const results = [];
+
+function check(name, cond, extra = "") {
+  results.push(!!cond);
+  console.log(`${cond ? "PASS" : "FAIL"}  ${name}${extra ? `  (${extra})` : ""}`);
+}
+
+async function signIn(page, email) {
+  await page.goto(`${BASE}/login`);
+  await page.locator("#email").fill(email);
+  await page.locator("#password").fill(PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.waitForURL("**/dashboard", { timeout: 30000 });
+}
+
+async function signOut(page) {
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.waitForURL("**/login");
+}
+
+async function createAccount(page, name, email, role) {
+  await page.goto(`${BASE}/accounts/new`);
+  await page.locator("#name").fill(name);
+  await page.locator("#email").fill(email);
+  await page.locator("#password").fill(PASSWORD);
+  await page.locator("#role").selectOption(role);
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.waitForURL("**/accounts");
+}
+
+async function enroll(page, classId, surname, firstname) {
+  await page.goto(`${BASE}/classes/${classId}`);
+  await page.locator('input[name="lrn"]').evaluate((el) => el.removeAttribute("pattern"));
+  await page.locator('input[name="lrn"]').fill(enroll.lrn ?? LRN);
+  await page.locator('input[name="surname"]').fill(surname);
+  await page.locator('input[name="firstname"]').fill(firstname);
+  await page.getByRole("button", { name: "Enroll student" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.waitFor({ state: "visible", timeout: 5000 });
+  await dialog.locator('input[type="password"]').fill(PASSWORD);
+  await dialog.getByRole("button", { name: "Confirm" }).click();
+  await page.waitForTimeout(2500);
+  return page.locator("body").innerText();
+}
+
+(async () => {
+  const db = new pg.Client({ connectionString: url });
+  await db.connect();
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+
+  const email = (who) => `${who}-${STAMP}@school.local`;
+  await signIn(page, "admin2@school.local");
+  await createAccount(page, "Adviser A", email("adviser-a"), "teacher");
+  await createAccount(page, "Adviser B", email("adviser-b"), "teacher");
+  await createAccount(page, "Unrelated Teacher", email("unrelated"), "teacher");
+  await createAccount(page, "School Registrar", email("registrar"), "registrar");
+  await signOut(page);
+
+  const idOf = async (who) =>
+    (await db.query('SELECT id FROM "user" WHERE email = $1', [email(who)])).rows[0].id;
+  const classA = randomUUID();
+  const classB = randomUUID();
+  await db.query("INSERT INTO class (id, name, grade_level_id, adviser_id) VALUES ($1, $2, 'grade-11', $3)", [
+    classA, `E2E A ${STAMP}`, await idOf("adviser-a"),
+  ]);
+  await db.query("INSERT INTO class (id, name, grade_level_id, adviser_id) VALUES ($1, $2, 'grade-11', $3)", [
+    classB, `E2E B ${STAMP}`, await idOf("adviser-b"),
+  ]);
+
+  await signIn(page, email("adviser-a"));
+  enroll.lrn = "12345";
+  let body = await enroll(page, classA, "Santos", "Maria");
+  check("LRN must be 12 digits", body.includes("exactly 12 digits"));
+  enroll.lrn = LRN;
+  body = await enroll(page, classA, "Santos", "Maria");
+  check("adviser enrolls a new student", body.includes(LRN));
+  body = await enroll(page, classA, "Santos", "Mariana");
+  const own = (await db.query("SELECT firstname FROM student WHERE lrn = $1", [LRN])).rows[0].firstname;
+  check("adviser can correct a student only in their class", own === "Mariana", own);
+  await signOut(page);
+
+  await signIn(page, email("adviser-b"));
+  body = await enroll(page, classB, "Impostor", "Name");
+  check("other class cannot overwrite the student", body.includes("belongs to a student in another class"));
+  const enrolledInB = await db.query(
+    "SELECT 1 FROM enrollment e JOIN student s ON s.id = e.student_id WHERE e.class_id = $1 AND s.lrn = $2",
+    [classB, LRN]
+  );
+  check("student was not enrolled", enrolledInB.rowCount === 0);
+  const kept = (await db.query("SELECT surname FROM student WHERE lrn = $1", [LRN])).rows[0].surname;
+  check("existing record unchanged", kept === "Santos", kept);
+  body = await enroll(page, classB, "santos", "MARIANA");
+  check("matching details enroll in a second class", body.includes(LRN));
+  await signOut(page);
+
+  await signIn(page, email("unrelated"));
+  await page.goto(`${BASE}/classes/${classA}`);
+  body = await page.locator("body").innerText();
+  check("unrelated teacher cannot see the roster", !body.includes(LRN) && body.includes("can see its students"));
+  await signOut(page);
+
+  await signIn(page, email("registrar"));
+  await page.goto(`${BASE}/classes/${classA}`);
+  check("registrar can see the roster", (await page.locator("body").innerText()).includes(LRN));
+  await signOut(page);
+
+  const levelId = `e2e-level-${STAMP}`;
+  await db.query("INSERT INTO grade_level (id, name, sort_order) VALUES ($1, $2, 900)", [levelId, `E2E Level ${STAMP}`]);
+  const levelExists = async () => (await db.query("SELECT 1 FROM grade_level WHERE id = $1", [levelId])).rowCount === 1;
+  await signIn(page, "admin2@school.local");
+  await page.goto(`${BASE}/curriculum/${levelId}`);
+  await page.getByRole("button", { name: "Delete grade level" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.locator('input[type="password"]').fill("WrongPass999!");
+  await dialog.getByRole("button", { name: "Delete grade level" }).click();
+  await page.waitForTimeout(2500);
+  check("grade level delete refuses a wrong password", (await dialog.innerText()).includes("Incorrect password") && (await levelExists()));
+  await dialog.locator('input[type="password"]').fill(PASSWORD);
+  await dialog.getByRole("button", { name: "Delete grade level" }).click();
+  await page.waitForURL("**/curriculum", { timeout: 15000 });
+  check("grade level delete works with the password", !(await levelExists()));
+
+  await browser.close();
+  await db.end();
+  const failed = results.filter((r) => !r).length;
+  console.log(`\n${results.length - failed}/${results.length} checks passed`);
+  process.exit(failed ? 1 : 0);
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

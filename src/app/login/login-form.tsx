@@ -2,7 +2,6 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { PasswordInput } from "@/components/password-input";
 
@@ -106,12 +105,7 @@ export function LoginForm({
               {loading === "form" ? "Signing in…" : "Sign in"}
             </button>
           </form>
-          <p className="mt-6 text-center text-sm text-muted">
-            No account yet?{" "}
-            <Link href="/register" className="font-medium text-accent-strong hover:underline">
-              Register
-            </Link>
-          </p>
+          <p className="mt-6 text-center text-sm text-muted">No account yet? Ask your System Admin.</p>
         </div>
 
         {demoLogins.length > 0 && (
