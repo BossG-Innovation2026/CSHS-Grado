@@ -69,3 +69,5 @@ jobs:
         run: node scripts/e2e-m1.js
       - name: E2E - password-confirmed class changes
         run: node scripts/verify-passwords.js
+      - name: E2E - student records and grade-level deletion
+        run: node scripts/e2e-records.js

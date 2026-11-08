@@ -204,7 +204,7 @@ export default async function ClassDetailPage({
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {students.map((s) => (
+            {(students ?? []).map((s) => (
               <tr key={s.id}>
                 <td className="px-4 py-3 font-medium text-accent-strong">{s.lrn}</td>
                 <td className="px-4 py-3 text-foreground">{s.surname}</td>
@@ -218,10 +218,12 @@ export default async function ClassDetailPage({
                 </td>
               </tr>
             ))}
-            {students.length === 0 && (
+            {(students === null || students.length === 0) && (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-subtle">
-                  No students enrolled yet.
+                  {students === null
+                    ? "Only this class's adviser, its subject teachers, and school-level staff can see its students."
+                    : "No students enrolled yet."}
                 </td>
               </tr>
             )}

@@ -1,11 +1,12 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, count, eq, ne, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb, schema } from "@/db";
 import { TERMS, type Term } from "@/lib/terms";
+import { isAdmin } from "@/lib/modules";
 import type { SessionUser } from "@/lib/session";
 import { checkOwnPassword, userWithModule } from "@/server/guards";
 import { canManageClass, findClass } from "@/server/classes";
@@ -209,22 +210,82 @@ interface StudentInput {
   sex: string;
 }
 
+/** DepEd Learner Reference Numbers are exactly 12 digits. */
+const LRN_PATTERN = /^\d{12}$/;
+
 function validStudent(s: StudentInput): boolean {
-  return Boolean(s.lrn && s.surname && s.firstname) && (s.sex === "M" || s.sex === "F");
+  return LRN_PATTERN.test(s.lrn) && Boolean(s.surname && s.firstname) && (s.sex === "M" || s.sex === "F");
+}
+
+function sameDetails(a: StudentInput, b: StudentInput): boolean {
+  const same = (x: string, y: string) => x.trim().toLowerCase() === y.trim().toLowerCase();
+  return (
+    same(a.surname, b.surname) &&
+    same(a.firstname, b.firstname) &&
+    same(a.middlename, b.middlename) &&
+    same(a.sex, b.sex)
+  );
 }
 
 /**
- * Create/update students by LRN and enroll them in a class, in one
- * transaction with a constant number of queries per 500 students.
- * Returns how many enrollments were new.
+ * Create students by LRN and enroll them in a class, in one transaction with
+ * a constant number of queries per 500 students.
+ *
+ * An existing student's details may be changed only by a System Admin or when
+ * the student is in no other class. Anyone else submitting different details
+ * for that LRN is refused (`blocked`) rather than enrolled, since a mismatch
+ * usually means a mistyped LRN.
  */
-async function enrollStudents(classId: string, students: StudentInput[]): Promise<number> {
+async function enrollStudents(
+  actor: SessionUser,
+  classId: string,
+  students: StudentInput[]
+): Promise<{ added: number; blocked: number }> {
   let added = 0;
+  let blocked = 0;
   await getDb().transaction(async (tx) => {
     for (const part of chunk(students, 500)) {
+      const existing = await tx
+        .select({
+          id: student.id,
+          lrn: student.lrn,
+          surname: student.surname,
+          firstname: student.firstname,
+          middlename: student.middlename,
+          sex: student.sex,
+        })
+        .from(student)
+        .where(
+          inArray(
+            student.lrn,
+            part.map((s) => s.lrn)
+          )
+        );
+      const existingByLrn = new Map(existing.map((e) => [e.lrn, e]));
+      const changedIds = part.flatMap((s) => {
+        const current = existingByLrn.get(s.lrn);
+        return current && !sameDetails(s, current) ? [current.id] : [];
+      });
+
+      const lockedIds = new Set<string>();
+      if (changedIds.length > 0 && !isAdmin(actor)) {
+        const elsewhere = await tx
+          .selectDistinct({ studentId: enrollment.studentId })
+          .from(enrollment)
+          .where(and(inArray(enrollment.studentId, changedIds), ne(enrollment.classId, classId)));
+        for (const row of elsewhere) lockedIds.add(row.studentId);
+      }
+
+      const allowed = part.filter((s) => {
+        const current = existingByLrn.get(s.lrn);
+        return !current || sameDetails(s, current) || !lockedIds.has(current.id);
+      });
+      blocked += part.length - allowed.length;
+      if (allowed.length === 0) continue;
+
       const saved = await tx
         .insert(student)
-        .values(part.map((s) => ({ id: randomUUID(), ...s })))
+        .values(allowed.map((s) => ({ id: randomUUID(), ...s })))
         .onConflictDoUpdate({
           target: student.lrn,
           set: {
@@ -243,7 +304,7 @@ async function enrollStudents(classId: string, students: StudentInput[]): Promis
       added += enrolled.length;
     }
   });
-  return added;
+  return { added, blocked };
 }
 
 export async function enrollStudent(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -258,19 +319,24 @@ export async function enrollStudent(_prev: ActionState, formData: FormData): Pro
     middlename: String(formData.get("middlename") ?? "").trim(),
     sex: String(formData.get("sex") ?? "").trim().toUpperCase(),
   };
-  if (!input.lrn) return { error: "LRN is required." };
+  if (!LRN_PATTERN.test(input.lrn)) return { error: "LRN must be exactly 12 digits." };
   if (!input.surname || !input.firstname) return { error: "Surname and first name are required." };
   if (input.sex !== "M" && input.sex !== "F") return { error: "Sex must be M or F." };
 
-  const added = await enrollStudents(classId, [input]);
+  const { added, blocked } = await enrollStudents(auth.user, classId, [input]);
+  if (blocked > 0) {
+    return {
+      error: `LRN ${input.lrn} belongs to a student in another class with different details. Check the LRN, or ask a System Admin to correct the record.`,
+    };
+  }
   if (added === 0) return { error: `Student ${input.lrn} is already enrolled in this class.` };
 
   revalidatePath(`/classes/${classId}`);
   return { ok: true };
 }
 
-/** The example row shipped in the downloadable template. */
-const TEMPLATE_SAMPLE_LRN = "1234567890";
+/** The example row in the downloadable template (the first value is from older downloads). */
+const TEMPLATE_SAMPLE_LRNS = ["1234567890", "123456789012"];
 
 export async function enrollFromTemplate(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const classId = String(formData.get("classId") ?? "");
@@ -293,7 +359,7 @@ export async function enrollFromTemplate(_prev: ActionState, formData: FormData)
       middlename: cell(row, "Middlename", "Middle name", "middlename"),
       sex: cell(row, "Sex", "sex").toUpperCase(),
     };
-    if (s.lrn === TEMPLATE_SAMPLE_LRN && s.surname === "Doe" && s.firstname === "John") continue;
+    if (TEMPLATE_SAMPLE_LRNS.includes(s.lrn) && s.surname === "Doe" && s.firstname === "John") continue;
     if (!validStudent(s)) {
       invalid += 1;
       continue;
@@ -302,13 +368,15 @@ export async function enrollFromTemplate(_prev: ActionState, formData: FormData)
     byLrn.set(s.lrn, s);
   }
 
-  const added = byLrn.size > 0 ? await enrollStudents(classId, [...byLrn.values()]) : 0;
-  const skipped = byLrn.size - added + duplicates;
+  const { added, blocked } =
+    byLrn.size > 0 ? await enrollStudents(auth.user, classId, [...byLrn.values()]) : { added: 0, blocked: 0 };
+  const skipped = byLrn.size - added - blocked + duplicates;
+  const conflicts = blocked > 0 ? ` Not enrolled: ${blocked} (LRN belongs to a student in another class with different details).` : "";
 
   revalidatePath(`/classes/${classId}`);
   return {
     ok: true,
-    message: `Enrolled ${added} student(s). Skipped ${skipped} already enrolled. Invalid rows: ${invalid}.`,
+    message: `Enrolled ${added} student(s). Skipped ${skipped} already enrolled. Invalid rows: ${invalid}.${conflicts}`,
   };
 }
 

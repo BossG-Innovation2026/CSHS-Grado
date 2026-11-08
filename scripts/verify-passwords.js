@@ -18,16 +18,7 @@ const CLASS_ID = "22222222-3333-4444-5555-666666666666";
   page.on("pageerror", (e) => { failures.push("PAGEERROR: " + e.message); });
   page.on("console", (m) => { if (m.type() === "error") failures.push("CONSOLE: " + m.text().slice(0, 200)); });
 
-  // register (no-op with a message if the account already exists)
-  await page.goto(BASE + "/register");
-  await page.locator("#name").fill("Repro Two");
-  await page.locator("#email").fill(EMAIL);
-  await page.locator("#password").fill(PASSWORD);
-  await page.getByRole("button", { name: /register|create/i }).click();
-  await page.waitForURL("**/login**", { timeout: 15000 }).catch(() => {});
-  console.log("registered:", page.url());
-
-  // ensure role/permissions/subjects/class (scripts/seed-dev.mjs)
+  // create the account and its role/permissions/subjects/class (scripts/seed-dev.mjs)
   execFileSync(process.execPath, ["--env-file-if-exists=.env.local", "scripts/seed-dev.mjs"], {
     stdio: "inherit",
     env: { ...process.env, SEED_EMAIL: EMAIL, SEED_PASSWORD: PASSWORD },

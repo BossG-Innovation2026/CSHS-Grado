@@ -68,6 +68,15 @@ async function check(name, cond, extra = "") {
   await page.waitForURL("**/accounts");
   await signOut(page);
 
+  // --- 0b. Once a System Admin exists, nobody can sign themselves up
+  await page.goto(`${BASE}/register`);
+  await check("registration page closed", (await page.locator("body").innerText()).includes("Registration is closed"));
+  const signUp = await page.request.post(`${BASE}/api/auth/sign-up/email`, {
+    headers: { origin: BASE },
+    data: { name: "Intruder", email: `intruder-${Date.now()}@school.local`, password: PASSWORD },
+  });
+  await check("sign-up API rejected", !signUp.ok(), `status ${signUp.status()}`);
+
   // --- 1. Second System Admin creates a teacher account with selected modules
   await signIn(page, "admin2@school.local");
   await page.goto(`${BASE}/accounts/new`);
@@ -110,7 +119,6 @@ const nav = await page.locator("nav").innerText();
   await check("dashboard shows analytics placeholder", dashText.includes("Analytics and notifications"));
 
   // --- 3. Teacher's own account page is read-only
-  const teacherId = (await page.request.get(`${BASE}/api/auth/get-session`, {}));
   await signOut(page);
 
   // --- 4. System Admin self-edit: every module locked on
@@ -133,6 +141,9 @@ const nav = await page.locator("nav").innerText();
   await check("edit page shows target", editText.includes(TEACHER_EMAIL) || editText.includes("M1 Test Teacher"));
 
   // --- 6. Reset password, then log in with new password
+  const teacherContext = await browser.newContext();
+  const teacherPage = await teacherContext.newPage();
+  await signIn(teacherPage, TEACHER_EMAIL, TEACHER_PASSWORD);
   await signOut(page);
   await signIn(page, "admin2@school.local");
   await page.goto(`${BASE}/accounts`);
@@ -141,6 +152,9 @@ const nav = await page.locator("nav").innerText();
   await page.getByRole("button", { name: "Reset password" }).click();
   await page.getByText("Saved.").first().waitFor({ timeout: 8000 });
   await check("reset password saved", true);
+  await teacherPage.goto(`${BASE}/dashboard`);
+  await check("reset signs out existing sessions", teacherPage.url().includes("/login"), teacherPage.url());
+  await teacherContext.close();
   await signOut(page);
   await page.goto(`${BASE}/login`);
   await page.locator("#email").fill(TEACHER_EMAIL);

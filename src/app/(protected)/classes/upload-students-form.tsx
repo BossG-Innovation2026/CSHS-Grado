@@ -12,7 +12,7 @@ export function UploadStudentsForm({ classId }: { classId: string }) {
       <h3 className="text-sm font-semibold text-foreground">Upload template</h3>
       <p className="text-xs text-muted">
         Fill the downloaded Excel template with students and upload here. Students are matched by
-        LRN; already-enrolled ones are skipped.
+        their 12-digit LRN; already-enrolled ones are skipped.
       </p>
       <input type="hidden" name="classId" value={classId} />
       <div className="flex items-center gap-2">

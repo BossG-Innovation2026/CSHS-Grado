@@ -3,8 +3,9 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, max } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { getDb, schema } from "@/db";
-import { adminUser } from "@/server/guards";
+import { adminUser, checkOwnPassword } from "@/server/guards";
 import { findGradeLevel } from "@/server/curriculum";
 import { cell, chunk, readFirstSheet } from "@/server/spreadsheet";
 
@@ -53,13 +54,16 @@ export async function addGradeLevel(_prev: ActionState, formData: FormData): Pro
   return { ok: true };
 }
 
-export async function deleteGradeLevel(formData: FormData): Promise<void> {
+export async function deleteGradeLevel(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const actor = await adminUser();
-  if (!actor) return;
+  if (!actor) return { error: "You are not authorized to modify the curriculum." };
+  const passwordError = await checkOwnPassword(actor, String(formData.get("password") ?? ""));
+  if (passwordError) return { error: passwordError };
 
   const id = String(formData.get("id") ?? "");
   await getDb().delete(gradeLevel).where(eq(gradeLevel.id, id));
   revalidateCurriculum();
+  redirect("/curriculum");
 }
 
 export async function addSubject(formData: FormData): Promise<ActionState> {

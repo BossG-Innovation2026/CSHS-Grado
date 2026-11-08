@@ -11,7 +11,7 @@ export function EnrollStudentForm({ classId }: { classId: string }) {
     <PasswordConfirmForm action={action} className="space-y-2">
       <h3 className="text-sm font-semibold text-foreground">Enroll individually</h3>
       <p className="text-xs text-muted">
-        Add one student at a time. If the LRN already exists, the student is enrolled as-is.
+        Add one student at a time. A student already in another class must match that record.
       </p>
       <input type="hidden" name="classId" value={classId} />
       <div className="grid grid-cols-2 gap-2">
@@ -20,6 +20,10 @@ export function EnrollStudentForm({ classId }: { classId: string }) {
           <input
             name="lrn"
             required
+            inputMode="numeric"
+            pattern="\d{12}"
+            maxLength={12}
+            title="12-digit LRN"
             placeholder="e.g. 136789010123"
             className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-subtle focus:border-accent focus:outline-none"
           />
