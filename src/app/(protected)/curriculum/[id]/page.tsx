@@ -2,6 +2,9 @@ import Link from "next/link";
 import { requireModule } from "@/lib/access";
 import { isAdmin } from "@/lib/access";
 import { deleteSubject } from "../actions";
+import { GRADING_GROUPS, curriculumFor, groupsForCurriculum, isGradingGroup } from "@/lib/grading";
+import { findCurrentSchoolYear } from "@/server/school-years";
+import { SubjectGroupSelect } from "../subject-group-select";
 import { getGradeLevel, listSubjects } from "@/server/curriculum";
 import { countClassesByGrade } from "@/server/classes";
 import { AddSubjectForm } from "../add-subject-form";
@@ -19,7 +22,8 @@ export default async function GradeLevelDetailPage({
   const { id } = await params;
   const admin = isAdmin(user);
 
-  const [level, subjects, classCounts] = await Promise.all([
+  const [year, level, subjects, classCounts] = await Promise.all([
+    findCurrentSchoolYear(),
     getGradeLevel(id),
     listSubjects(id),
     // Only admins can delete, and only they are sure to have the Classes module.
@@ -35,6 +39,8 @@ export default async function GradeLevelDetailPage({
       </div>
     );
   }
+
+  const gradingGroups = groupsForCurriculum(curriculumFor(year.policyKey, level.name));
 
   return (
     <div>
@@ -57,7 +63,7 @@ export default async function GradeLevelDetailPage({
       {admin && (
         <div className="mt-6 max-w-3xl rounded-lg border border-border bg-surface p-4">
           <h2 className="text-sm font-semibold text-foreground">Add subject</h2>
-          <AddSubjectForm gradeLevelId={level.id} />
+          <AddSubjectForm gradeLevelId={level.id} gradingGroups={gradingGroups} />
         </div>
       )}
 
@@ -75,6 +81,7 @@ export default async function GradeLevelDetailPage({
               <th className="px-4 py-3">Subject</th>
               <th className="px-4 py-3">Terms</th>
               <th className="px-4 py-3">Credit Units</th>
+              <th className="px-4 py-3">Grading group</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
@@ -82,11 +89,28 @@ export default async function GradeLevelDetailPage({
             {subjects.map((s) => (
               <tr key={s.id}>
                 <td className="px-4 py-3 font-medium text-accent-strong">{s.code}</td>
-                <td className="px-4 py-3 text-foreground">{s.title}</td>
+                <td className="px-4 py-3 text-foreground">
+                  {s.title}
+                  {s.learningArea && <p className="mt-0.5 text-xs text-subtle">{s.learningArea}</p>}
+                </td>
                 <td className="px-4 py-3 text-xs text-muted">
                   {s.terms} term{s.terms === 1 ? "" : "s"}
                 </td>
                 <td className="px-4 py-3 text-xs text-muted">{s.creditUnits}</td>
+                <td className="px-4 py-3 text-xs text-muted">
+                  {admin ? (
+                    <SubjectGroupSelect
+                      id={s.id}
+                      gradeLevelId={level.id}
+                      value={s.gradingGroup}
+                      options={gradingGroups}
+                    />
+                  ) : s.gradingGroup && isGradingGroup(s.gradingGroup) ? (
+                    GRADING_GROUPS[s.gradingGroup].label
+                  ) : (
+                    "Not set"
+                  )}
+                </td>
                 <td className="px-4 py-3 text-right">
                   {admin && (
                     <form action={deleteSubject}>
@@ -105,7 +129,7 @@ export default async function GradeLevelDetailPage({
             ))}
             {subjects.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-subtle">
+                <td colSpan={6} className="px-4 py-8 text-center text-subtle">
                   No subjects yet. {admin ? "Use the form above to add one." : ""}
                 </td>
               </tr>

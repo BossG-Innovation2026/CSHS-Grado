@@ -7,6 +7,8 @@ import { redirect } from "next/navigation";
 import { getDb, schema } from "@/db";
 import { TERMS, type Term } from "@/lib/terms";
 import { isAdmin } from "@/lib/modules";
+import { curriculumFor } from "@/lib/grading";
+import { findCurrentSchoolYear } from "@/server/school-years";
 import type { SessionUser } from "@/lib/session";
 import { checkOwnPassword, userWithModule } from "@/server/guards";
 import { canManageClass, findClass } from "@/server/classes";
@@ -62,13 +64,14 @@ export async function createClass(_prev: ActionState, formData: FormData): Promi
     .where(eq(gradeLevel.id, gradeLevelId))
     .limit(1);
   if (!level) return { error: "Choose a grade level." };
+  const year = await findCurrentSchoolYear();
 
   let name = String(formData.get("name") ?? "").trim();
   if (!name) {
     const [{ existing }] = await db
       .select({ existing: count() })
       .from(schoolClass)
-      .where(eq(schoolClass.gradeLevelId, gradeLevelId));
+      .where(and(eq(schoolClass.schoolYearId, year.id), eq(schoolClass.gradeLevelId, gradeLevelId)));
     name = nextSectionName(level.name, Number(existing));
   }
 
@@ -78,7 +81,13 @@ export async function createClass(_prev: ActionState, formData: FormData): Promi
       .select({ name: schoolClass.name })
       .from(schoolClass)
       .innerJoin(gradeLevel, eq(gradeLevel.id, schoolClass.gradeLevelId))
-      .where(and(eq(schoolClass.adviserId, user.id), ne(schoolClass.gradeLevelId, gradeLevelId)))
+      .where(
+        and(
+          eq(schoolClass.schoolYearId, year.id),
+          eq(schoolClass.adviserId, user.id),
+          ne(schoolClass.gradeLevelId, gradeLevelId)
+        )
+      )
       .orderBy(asc(gradeLevel.sortOrder))
       .limit(1);
     if (advisory) {
@@ -92,8 +101,16 @@ export async function createClass(_prev: ActionState, formData: FormData): Promi
   const classId = randomUUID();
   const inserted = await db
     .insert(schoolClass)
-    .values({ id: classId, name, gradeLevelId, adviserId: user.id })
-    .onConflictDoNothing({ target: [schoolClass.gradeLevelId, schoolClass.name] })
+    .values({
+      id: classId,
+      name,
+      gradeLevelId,
+      adviserId: user.id,
+      schoolYearId: year.id,
+      curriculum: curriculumFor(year.policyKey, level.name),
+    })
+    // No target: two unique indexes on section names exist until the older one is dropped.
+    .onConflictDoNothing()
     .returning({ id: schoolClass.id });
   if (inserted.length === 0) return { error: `${level.name} - ${name} already exists.` };
 
@@ -128,7 +145,13 @@ export async function addClassSubject(_prev: ActionState, formData: FormData): P
   const db = getDb();
   const subjectId = String(formData.get("subjectId") ?? "");
   const [picked] = await db
-    .select({ id: subject.id, code: subject.code, title: subject.title })
+    .select({
+      id: subject.id,
+      code: subject.code,
+      title: subject.title,
+      gradingGroup: subject.gradingGroup,
+      creditUnits: subject.creditUnits,
+    })
     .from(subject)
     .where(and(eq(subject.id, subjectId), eq(subject.gradeLevelId, cls.gradeLevelId)))
     .limit(1);
@@ -142,6 +165,8 @@ export async function addClassSubject(_prev: ActionState, formData: FormData): P
       subjectId: picked.id,
       code: picked.code,
       title: picked.title,
+      gradingGroup: picked.gradingGroup,
+      creditUnits: picked.creditUnits,
       description: String(formData.get("description") ?? "").trim(),
       teacherId: String(formData.get("teacherId") ?? "") || null,
       term,

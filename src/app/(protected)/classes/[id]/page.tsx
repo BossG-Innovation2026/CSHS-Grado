@@ -64,7 +64,8 @@ export default async function ClassDetailPage({
         <div>
           <h1 className="text-xl font-bold text-foreground">{cls.name}</h1>
           <p className="mt-1 text-sm text-muted">
-            {cls.gradeLevelName} · Adviser: <span className="text-foreground">{cls.adviserName}</span>
+            {cls.gradeLevelName} · Adviser: <span className="text-foreground">{cls.adviserName}</span> · SY{" "}
+            {cls.schoolYearId}
           </p>
         </div>
         {canEdit && <DeleteClassDialog classId={cls.id} className={cls.name} />}

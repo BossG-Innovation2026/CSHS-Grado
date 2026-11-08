@@ -1,15 +1,17 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, max } from "drizzle-orm";
+import { and, eq, isNull, max } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb, schema } from "@/db";
+import { curriculumFor, groupsForCurriculum, type Curriculum, type GradingGroupKey } from "@/lib/grading";
 import { adminUser, checkOwnPassword } from "@/server/guards";
+import { findCurrentSchoolYear } from "@/server/school-years";
 import { findGradeLevel } from "@/server/curriculum";
 import { cell, chunk, readFirstSheet } from "@/server/spreadsheet";
 
-const { gradeLevel, subject } = schema;
+const { classSubject, gradeLevel, subject } = schema;
 
 export interface ActionState {
   error?: string;
@@ -26,6 +28,18 @@ export interface BulkSubjectResult {
 function revalidateCurriculum(gradeLevelId?: string) {
   revalidatePath("/curriculum");
   if (gradeLevelId) revalidatePath(`/curriculum/${gradeLevelId}`);
+}
+
+async function curriculumOf(gradeLevelName: string): Promise<Curriculum> {
+  const year = await findCurrentSchoolYear();
+  return curriculumFor(year.policyKey, gradeLevelName);
+}
+
+/** A group for this curriculum (by key or label), null when blank, undefined when invalid. */
+function parseGradingGroup(raw: unknown, curriculum: Curriculum): GradingGroupKey | null | undefined {
+  const text = String(raw ?? "").trim().toLowerCase();
+  if (!text) return null;
+  return groupsForCurriculum(curriculum).find((g) => g.key === text || g.label.toLowerCase() === text)?.key;
 }
 
 function positiveInt(raw: unknown, fallback = 1): number {
@@ -83,14 +97,46 @@ export async function addSubject(formData: FormData): Promise<ActionState> {
   if (!title) return { error: "Subject title is required." };
   if (Number.isNaN(terms)) return { error: "Number of terms must be at least 1." };
   if (Number.isNaN(creditUnits)) return { error: "Credit units must be at least 1." };
+  const gradingGroup = parseGradingGroup(formData.get("gradingGroup"), await curriculumOf(level.name));
+  if (gradingGroup === undefined) return { error: "Choose a valid grading group." };
+  const learningArea = String(formData.get("learningArea") ?? "").trim() || null;
 
   const inserted = await getDb()
     .insert(subject)
-    .values({ id: randomUUID(), gradeLevelId, code, title, terms, creditUnits })
+    .values({ id: randomUUID(), gradeLevelId, code, title, terms, creditUnits, gradingGroup, learningArea })
     .onConflictDoNothing({ target: [subject.gradeLevelId, subject.code] })
     .returning({ id: subject.id });
   if (inserted.length === 0) return { error: `Subject ${code} already exists in ${level.name}.` };
 
+  revalidateCurriculum(gradeLevelId);
+  return { ok: true };
+}
+
+export async function setSubjectGradingGroup(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const actor = await adminUser();
+  if (!actor) return { error: "You are not authorized to modify the curriculum." };
+
+  const id = String(formData.get("id") ?? "");
+  const gradeLevelId = String(formData.get("gradeLevelId") ?? "");
+  const level = await findGradeLevel(gradeLevelId);
+  if (!level) return { error: "Grade level not found." };
+
+  const gradingGroup = parseGradingGroup(formData.get("gradingGroup"), await curriculumOf(level.name));
+  if (gradingGroup === undefined) return { error: "Choose a valid grading group." };
+
+  await getDb().transaction(async (tx) => {
+    await tx
+      .update(subject)
+      .set({ gradingGroup })
+      .where(and(eq(subject.id, id), eq(subject.gradeLevelId, gradeLevelId)));
+    // Classes keep their snapshot; this only fills ones set up before the group was chosen.
+    if (gradingGroup) {
+      await tx
+        .update(classSubject)
+        .set({ gradingGroup })
+        .where(and(eq(classSubject.subjectId, id), isNull(classSubject.gradingGroup)));
+    }
+  });
   revalidateCurriculum(gradeLevelId);
   return { ok: true };
 }
@@ -125,26 +171,40 @@ export async function bulkAddSubjects(formData: FormData): Promise<BulkSubjectRe
   let invalid = 0;
   let duplicates = 0;
   const errors: string[] = [];
-  const byCode = new Map<string, { code: string; title: string; terms: number; creditUnits: number }>();
+  const byCode = new Map<
+    string,
+    {
+      code: string;
+      title: string;
+      terms: number;
+      creditUnits: number;
+      gradingGroup: GradingGroupKey | null;
+      learningArea: string | null;
+    }
+  >();
+  const curriculum = await curriculumOf(level.name);
 
   for (const row of sheet.rows) {
     const code = cell(row, "Code", "code");
     const title = cell(row, "Title", "title");
     const terms = positiveInt(cell(row, "Terms", "terms"));
     const creditUnits = positiveInt(cell(row, "Credit Units", "creditUnits"));
+    const gradingGroup = parseGradingGroup(cell(row, "Grading Group", "gradingGroup"), curriculum);
+    const learningArea = cell(row, "Learning Area", "learningArea") || null;
 
     let problem: string | null = null;
     if (!code) problem = "Row missing subject code.";
     else if (!title) problem = `Subject code ${code} is missing a title.`;
     else if (Number.isNaN(terms)) problem = `Subject code ${code} has invalid terms.`;
     else if (Number.isNaN(creditUnits)) problem = `Subject code ${code} has invalid credit units.`;
-    if (problem) {
+    else if (gradingGroup === undefined) problem = `Subject code ${code} has an invalid grading group.`;
+    if (problem || gradingGroup === undefined) {
       invalid += 1;
-      errors.push(problem);
+      if (problem) errors.push(problem);
       continue;
     }
     if (byCode.has(code)) duplicates += 1;
-    byCode.set(code, { code, title, terms, creditUnits });
+    byCode.set(code, { code, title, terms, creditUnits, gradingGroup, learningArea });
   }
 
   // One INSERT per 500 rows instead of two queries per row.

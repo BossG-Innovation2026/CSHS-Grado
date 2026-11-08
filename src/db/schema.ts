@@ -12,9 +12,11 @@ import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  date,
   index,
   integer,
   pgTable,
+  primaryKey,
   smallint,
   text,
   timestamp,
@@ -135,6 +137,34 @@ export const schoolSettings = pgTable("school_settings", {
 /* Curriculum                                                          */
 /* ------------------------------------------------------------------ */
 
+/** A school year and the grading rules that apply to it. */
+export const schoolYear = pgTable(
+  "school_year",
+  {
+    id: text("id").primaryKey(), // e.g. 2026-2027
+    startsOn: date("starts_on", { mode: "string" }).notNull(),
+    endsOn: date("ends_on", { mode: "string" }).notNull(),
+    isCurrent: boolean("is_current").notNull().default(false),
+    policyKey: text("policy_key").notNull(),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("school_year_current_uq").on(t.isCurrent).where(sql`${t.isCurrent}`)]
+);
+
+export const schoolYearTerm = pgTable(
+  "school_year_term",
+  {
+    schoolYearId: text("school_year_id")
+      .notNull()
+      .references(() => schoolYear.id, { onDelete: "cascade" }),
+    term: smallint("term").notNull(),
+    startsOn: date("starts_on", { mode: "string" }),
+    endsOn: date("ends_on", { mode: "string" }),
+    submissionDeadline: date("submission_deadline", { mode: "string" }),
+  },
+  (t) => [primaryKey({ columns: [t.schoolYearId, t.term] })]
+);
+
 export const gradeLevel = pgTable("grade_level", {
   id: text("id").primaryKey(),
   name: text("name").notNull().unique(),
@@ -153,6 +183,10 @@ export const subject = pgTable(
     title: text("title").notNull(),
     terms: smallint("terms").notNull().default(1),
     creditUnits: smallint("credit_units").notNull().default(1),
+    /** Key from GRADING_GROUPS; grades cannot start while this is NULL. */
+    gradingGroup: text("grading_group"),
+    /** Groups parts graded as one learning area, e.g. Effective Communication. */
+    learningArea: text("learning_area"),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
   (t) => [
@@ -176,10 +210,19 @@ export const schoolClass = pgTable(
     adviserId: text("adviser_id")
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
+    // The default lets the previous release keep inserting while it is live; drop it next release.
+    schoolYearId: text("school_year_id")
+      .notNull()
+      .default("2026-2027")
+      .references(() => schoolYear.id, { onDelete: "restrict" }),
+    curriculum: text("curriculum").notNull().default("strengthened"),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
   (t) => [
+    // Superseded by class_year_grade_name_uq. Drop it next release, before a second school
+    // year needs the same section names; the previous release's ON CONFLICT targets it.
     uniqueIndex("class_grade_name_uq").on(t.gradeLevelId, t.name),
+    uniqueIndex("class_year_grade_name_uq").on(t.schoolYearId, t.gradeLevelId, t.name),
     index("class_adviser_idx").on(t.adviserId),
   ]
 );
@@ -202,6 +245,8 @@ export const classSubject = pgTable(
     description: text("description").notNull().default(""),
     teacherId: text("teacher_id").references(() => user.id, { onDelete: "set null" }),
     term: smallint("term").notNull().default(1),
+    gradingGroup: text("grading_group"),
+    creditUnits: smallint("credit_units").notNull().default(1),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
   (t) => [

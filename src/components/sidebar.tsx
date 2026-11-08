@@ -9,6 +9,7 @@ import {
   GraduationCap,
   Users,
   BookOpen,
+  CalendarDays,
   PenLine,
   ClipboardCheck,
   Landmark,
@@ -25,6 +26,7 @@ const MODULE_ICONS: Record<string, LucideIcon> = {
   grades_approve: ClipboardCheck,
   registrar: Landmark,
   codes: KeyRound,
+  "/settings/school-year": CalendarDays,
 };
 
 const STORAGE_KEY = "sidebar-collapsed";
@@ -112,7 +114,7 @@ export function Sidebar({
           </p>
         )}
         {links.map((item) => {
-          const Icon = item.module ? MODULE_ICONS[item.module] : null;
+          const Icon = MODULE_ICONS[item.href] ?? (item.module ? MODULE_ICONS[item.module] : null);
           if (!item.implemented) {
             return (
               <div

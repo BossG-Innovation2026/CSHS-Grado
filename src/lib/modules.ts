@@ -67,6 +67,7 @@ export const NAV_LINKS: {
   implemented: boolean;
 }[] = [
   { module: "accounts", href: "/accounts", label: "Account Management", implemented: true },
+  { module: "accounts", href: "/settings/school-year", label: "School Years", implemented: true },
   { module: "curriculum", href: "/curriculum", label: "Curriculum Setup", implemented: true },
   { module: "classes", href: "/classes", label: "Classes", implemented: true },
   { module: "grades_submit", href: "/grades", label: "Grade Submission", implemented: false },

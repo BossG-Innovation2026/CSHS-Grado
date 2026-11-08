@@ -85,14 +85,15 @@ try {
     );
   }
 
-  // Curriculum.
+  // Curriculum. Grade 11 uses the Strengthened SHS weights; Grade 12 keeps DO 8 in SY 2026-27.
+  const GROUP = { "grade-11": "core", "grade-12": "do8_core" };
   const subjectIds = {};
   for (const [grade, list] of Object.entries(SUBJECTS)) {
     for (const [code, title, terms, units] of list) {
       const r = await client.query(
-        `INSERT INTO subject (id, grade_level_id, code, title, terms, credit_units) VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT (grade_level_id, code) DO UPDATE SET title = excluded.title RETURNING id`,
-        [randomUUID(), grade, code, title, terms, units]
+        `INSERT INTO subject (id, grade_level_id, code, title, terms, credit_units, grading_group) VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (grade_level_id, code) DO UPDATE SET title = excluded.title, grading_group = excluded.grading_group RETURNING id`,
+        [randomUUID(), grade, code, title, terms, units, GROUP[grade]]
       );
       subjectIds[`${grade}:${code}`] = r.rows[0].id;
     }
@@ -111,16 +112,16 @@ try {
   let studentCount = 0;
   for (const c of classes) {
     const cls = await client.query(
-      `INSERT INTO class (id, name, grade_level_id, adviser_id) VALUES ($1, $2, $3, $4)
-       ON CONFLICT (grade_level_id, name) DO UPDATE SET adviser_id = excluded.adviser_id RETURNING id`,
-      [randomUUID(), c.name, c.grade, c.adviser]
+      `INSERT INTO class (id, name, grade_level_id, adviser_id, curriculum) VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (grade_level_id, name) DO UPDATE SET adviser_id = excluded.adviser_id, curriculum = excluded.curriculum RETURNING id`,
+      [randomUUID(), c.name, c.grade, c.adviser, c.grade === "grade-12" ? "do8" : "strengthened"]
     );
     const classId = cls.rows[0].id;
     for (const [i, [code, title]] of SUBJECTS[c.grade].entries()) {
       await client.query(
-        `INSERT INTO class_subject (id, class_id, subject_id, code, title, teacher_id, term)
-         VALUES ($1, $2, $3, $4, $5, $6, 1) ON CONFLICT (class_id, code, term) DO NOTHING`,
-        [randomUUID(), classId, subjectIds[`${c.grade}:${code}`], code, title, c.teachers[i % 2]]
+        `INSERT INTO class_subject (id, class_id, subject_id, code, title, teacher_id, term, grading_group)
+         VALUES ($1, $2, $3, $4, $5, $6, 1, $7) ON CONFLICT (class_id, code, term) DO UPDATE SET grading_group = excluded.grading_group`,
+        [randomUUID(), classId, subjectIds[`${c.grade}:${code}`], code, title, c.teachers[i % 2], GROUP[c.grade]]
       );
     }
     for (let i = 0; i < c.students; i++) {

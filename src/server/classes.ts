@@ -4,6 +4,7 @@ import { getDb, schema } from "@/db";
 import { requireModule } from "@/lib/access";
 import { isAdmin, ROLE_DEPARTMENT_HEAD, ROLE_REGISTRAR, ROLE_SCHOOL_HEAD } from "@/lib/modules";
 import type { SessionUser } from "@/lib/session";
+import { findCurrentSchoolYear } from "@/server/school-years";
 
 const { schoolClass, classSubject, gradeLevel, subject, user, student, enrollment } = schema;
 
@@ -14,6 +15,7 @@ export interface ClassRow {
   gradeLevelName: string;
   adviserId: string;
   adviserName: string;
+  schoolYearId: string;
 }
 
 export interface ClassSubjectRow {
@@ -44,17 +46,20 @@ const classColumns = {
   gradeLevelName: gradeLevel.name,
   adviserId: schoolClass.adviserId,
   adviserName: user.name,
+  schoolYearId: schoolClass.schoolYearId,
 };
 
 /* Reads: only callable from server code; each one re-checks module access. */
 
 export async function listClasses(): Promise<ClassRow[]> {
   await requireModule("classes");
+  const year = await findCurrentSchoolYear();
   return getDb()
     .select(classColumns)
     .from(schoolClass)
     .innerJoin(gradeLevel, eq(gradeLevel.id, schoolClass.gradeLevelId))
     .innerJoin(user, eq(user.id, schoolClass.adviserId))
+    .where(eq(schoolClass.schoolYearId, year.id))
     .orderBy(asc(gradeLevel.sortOrder), sql`lower(${schoolClass.name})`);
 }
 
@@ -100,11 +105,13 @@ export async function listGradeLevelsForClasses(): Promise<{ id: string; name: s
     .orderBy(asc(gradeLevel.sortOrder));
 }
 
-export async function countClassesByGrade(): Promise<Record<string, number>> {
+/** Classes per grade level, in one school year or across all of them. */
+export async function countClassesByGrade(schoolYearId?: string): Promise<Record<string, number>> {
   await requireModule("classes");
   const rows = await getDb()
     .select({ gradeLevelId: schoolClass.gradeLevelId, count: count() })
     .from(schoolClass)
+    .where(schoolYearId ? eq(schoolClass.schoolYearId, schoolYearId) : undefined)
     .groupBy(schoolClass.gradeLevelId);
   return Object.fromEntries(rows.map((r) => [r.gradeLevelId, Number(r.count)]));
 }
