@@ -1,5 +1,5 @@
 {
-  "id": "452bba72-2396-4266-ad51-26aac29d64c1",
+  "id": "c3d429a0-55af-42f9-81c8-86514f8a7999",
   "prevId": "6fac972a-30f9-44cd-b0a9-ed93ed6adceb",
   "version": "7",
   "dialect": "postgresql",
@@ -127,6 +127,84 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.audit_log": {
+      "name": "audit_log",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "at": {
+          "name": "at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entity": {
+          "name": "entity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entity_id": {
+          "name": "entity_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "detail": {
+          "name": "detail",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "audit_log_entity_idx": {
+          "name": "audit_log_entity_idx",
+          "columns": [
+            {
+              "expression": "entity",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "entity_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.class_subject": {
       "name": "class_subject",
       "schema": "",
@@ -176,19 +254,6 @@
         },
         "term": {
           "name": "term",
-          "type": "smallint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
-        },
-        "grading_group": {
-          "name": "grading_group",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "credit_units": {
-          "name": "credit_units",
           "type": "smallint",
           "primaryKey": false,
           "notNull": true,
@@ -410,6 +475,119 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.final_grade": {
+      "name": "final_grade",
+      "schema": "",
+      "columns": {
+        "class_subject_id": {
+          "name": "class_subject_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "student_id": {
+          "name": "student_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "grade": {
+          "name": "grade",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "final_grade_student_idx": {
+          "name": "final_grade_student_idx",
+          "columns": [
+            {
+              "expression": "student_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "final_grade_class_subject_id_class_subject_id_fk": {
+          "name": "final_grade_class_subject_id_class_subject_id_fk",
+          "tableFrom": "final_grade",
+          "tableTo": "class_subject",
+          "columnsFrom": [
+            "class_subject_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "final_grade_student_id_student_id_fk": {
+          "name": "final_grade_student_id_student_id_fk",
+          "tableFrom": "final_grade",
+          "tableTo": "student",
+          "columnsFrom": [
+            "student_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "final_grade_updated_by_user_id_fk": {
+          "name": "final_grade_updated_by_user_id_fk",
+          "tableFrom": "final_grade",
+          "tableTo": "user",
+          "columnsFrom": [
+            "updated_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "final_grade_class_subject_id_student_id_pk": {
+          "name": "final_grade_class_subject_id_student_id_pk",
+          "columns": [
+            "class_subject_id",
+            "student_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "final_grade_range": {
+          "name": "final_grade_range",
+          "value": "\"final_grade\".\"grade\" between 60 and 100"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.grade_level": {
       "name": "grade_level",
       "schema": "",
@@ -452,6 +630,102 @@
           ]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.grade_submission": {
+      "name": "grade_submission",
+      "schema": "",
+      "columns": {
+        "class_subject_id": {
+          "name": "class_subject_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "submitted_by": {
+          "name": "submitted_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "submitted_at": {
+          "name": "submitted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decided_by": {
+          "name": "decided_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decided_at": {
+          "name": "decided_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "return_note": {
+          "name": "return_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "grade_submission_class_subject_id_class_subject_id_fk": {
+          "name": "grade_submission_class_subject_id_class_subject_id_fk",
+          "tableFrom": "grade_submission",
+          "tableTo": "class_subject",
+          "columnsFrom": [
+            "class_subject_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "grade_submission_submitted_by_user_id_fk": {
+          "name": "grade_submission_submitted_by_user_id_fk",
+          "tableFrom": "grade_submission",
+          "tableTo": "user",
+          "columnsFrom": [
+            "submitted_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "grade_submission_decided_by_user_id_fk": {
+          "name": "grade_submission_decided_by_user_id_fk",
+          "tableFrom": "grade_submission",
+          "tableTo": "user",
+          "columnsFrom": [
+            "decided_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -623,13 +897,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'2026-2027'"
-        },
-        "curriculum": {
-          "name": "curriculum",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'strengthened'"
         },
         "created_at": {
           "name": "created_at",
@@ -832,12 +1099,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
-        },
-        "policy_key": {
-          "name": "policy_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
         },
         "created_at": {
           "name": "created_at",
@@ -1167,18 +1428,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": 1
-        },
-        "grading_group": {
-          "name": "grading_group",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "learning_area": {
-          "name": "learning_area",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "created_at": {
           "name": "created_at",

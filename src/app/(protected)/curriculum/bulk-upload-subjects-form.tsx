@@ -13,8 +13,7 @@ export function BulkUploadSubjectsForm({ gradeLevelId }: { gradeLevelId: string 
     <div className="mt-4 max-w-3xl rounded-lg border border-border bg-surface p-4">
       <h2 className="text-sm font-semibold text-foreground">Bulk add subjects</h2>
       <p className="mt-1 text-xs text-muted">
-        Download the Excel template, fill in subjects, and upload here. Grading Group is optional
-        and can be set in the table below.
+        Download the Excel template, fill in subjects, and upload here.
       </p>
       <div className="mt-3 flex items-center gap-2 flex-wrap">
         <a

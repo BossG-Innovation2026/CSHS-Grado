@@ -10,7 +10,7 @@ const client = new pg.Client({ connectionString: url });
 await client.connect();
 try {
   await client.query(
-    'TRUNCATE "user", account, session, verification, notification, rate_limit, class, class_subject, enrollment CASCADE'
+    'TRUNCATE "user", account, session, verification, notification, rate_limit, class, class_subject, enrollment, audit_log CASCADE'
   );
   console.log("Local DB accounts and classes wiped for a fresh bootstrap.");
 } finally {

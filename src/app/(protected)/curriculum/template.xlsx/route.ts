@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   await requireModule("curriculum");
   const file = buildWorkbook("Subjects", [
-    ["Code", "Title", "Terms", "Credit Units", "Grading Group", "Learning Area"],
+    ["Code", "Title", "Terms", "Credit Units"],
     ["GEN-MATH", "General Mathematics", 3, 1],
     ["OC11", "Oral Communication", 1, 1],
   ]);

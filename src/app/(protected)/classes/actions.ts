@@ -7,11 +7,11 @@ import { redirect } from "next/navigation";
 import { getDb, schema } from "@/db";
 import { TERMS, type Term } from "@/lib/terms";
 import { isAdmin } from "@/lib/modules";
-import { curriculumFor } from "@/lib/grading";
 import { findCurrentSchoolYear } from "@/server/school-years";
 import type { SessionUser } from "@/lib/session";
 import { checkOwnPassword, userWithModule } from "@/server/guards";
 import { canManageClass, findClass } from "@/server/classes";
+import { classHasGrades, studentHasGrades, subjectHasGrades } from "@/server/grades";
 import { cell, chunk, readFirstSheet } from "@/server/spreadsheet";
 
 const { schoolClass, classSubject, gradeLevel, subject, student, enrollment } = schema;
@@ -107,7 +107,6 @@ export async function createClass(_prev: ActionState, formData: FormData): Promi
       gradeLevelId,
       adviserId: user.id,
       schoolYearId: year.id,
-      curriculum: curriculumFor(year.policyKey, level.name),
     })
     // No target: two unique indexes on section names exist until the older one is dropped.
     .onConflictDoNothing()
@@ -145,13 +144,7 @@ export async function addClassSubject(_prev: ActionState, formData: FormData): P
   const db = getDb();
   const subjectId = String(formData.get("subjectId") ?? "");
   const [picked] = await db
-    .select({
-      id: subject.id,
-      code: subject.code,
-      title: subject.title,
-      gradingGroup: subject.gradingGroup,
-      creditUnits: subject.creditUnits,
-    })
+    .select({ id: subject.id, code: subject.code, title: subject.title })
     .from(subject)
     .where(and(eq(subject.id, subjectId), eq(subject.gradeLevelId, cls.gradeLevelId)))
     .limit(1);
@@ -165,8 +158,6 @@ export async function addClassSubject(_prev: ActionState, formData: FormData): P
       subjectId: picked.id,
       code: picked.code,
       title: picked.title,
-      gradingGroup: picked.gradingGroup,
-      creditUnits: picked.creditUnits,
       description: String(formData.get("description") ?? "").trim(),
       teacherId: String(formData.get("teacherId") ?? "") || null,
       term,
@@ -185,6 +176,7 @@ export async function removeClassSubject(_prev: ActionState, formData: FormData)
   if (!classId) return { error: "Subject not found." };
   const auth = await authorizeClassChange(formData, classId);
   if ("error" in auth) return auth;
+  if (await subjectHasGrades(id)) return { error: "This subject has grades and cannot be removed." };
 
   await getDb().delete(classSubject).where(eq(classSubject.id, id));
   revalidatePath(`/classes/${classId}`);
@@ -195,6 +187,9 @@ export async function deleteClass(_prev: ActionState, formData: FormData): Promi
   const id = String(formData.get("id") ?? "");
   const auth = await authorizeClassChange(formData, id);
   if ("error" in auth) return auth;
+  if (await classHasGrades(id)) {
+    return { error: "This class has grades and cannot be deleted. DepEd requires keeping these records." };
+  }
 
   await getDb().delete(schoolClass).where(eq(schoolClass.id, id));
   revalidatePath("/classes");
@@ -411,6 +406,9 @@ export async function unenrollStudent(_prev: ActionState, formData: FormData): P
   if ("error" in auth) return auth;
 
   const studentId = String(formData.get("studentId") ?? "");
+  if (await studentHasGrades(classId, studentId)) {
+    return { error: "This learner has grades in this class and cannot be unenrolled." };
+  }
   await getDb()
     .delete(enrollment)
     .where(and(eq(enrollment.classId, classId), eq(enrollment.studentId, studentId)));

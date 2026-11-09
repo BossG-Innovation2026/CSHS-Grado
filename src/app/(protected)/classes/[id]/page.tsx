@@ -9,6 +9,7 @@ import {
   listStudents,
   listSubjectsByGrade,
 } from "@/server/classes";
+import { canViewConsolidated } from "@/server/grades";
 import { RenameClassForm } from "../rename-class-form";
 import { AddClassSubjectForm } from "../add-class-subject-form";
 import { EnrollStudentForm } from "../enroll-student-form";
@@ -44,11 +45,12 @@ export default async function ClassDetailPage({
   }
 
   const term = TERMS.includes(Number(termParam) as Term) ? (Number(termParam) as Term) : 1;
-  const [subjects, teachers, students, curriculumSubjects] = await Promise.all([
+  const [subjects, teachers, students, curriculumSubjects, showConsolidated] = await Promise.all([
     listClassSubjects(id, term),
     listActiveTeachers(),
     listStudents(id),
     listSubjectsByGrade(cls.gradeLevelId),
+    canViewConsolidated(user, id),
   ]);
 
   const canEdit = isAdmin(user) || cls.adviserId === user.id;
@@ -68,7 +70,14 @@ export default async function ClassDetailPage({
             {cls.schoolYearId}
           </p>
         </div>
-        {canEdit && <DeleteClassDialog classId={cls.id} className={cls.name} />}
+        <div className="flex items-center gap-3">
+          {showConsolidated && (
+            <Link href={`/classes/${cls.id}/grades`} className="text-sm text-accent-strong hover:underline">
+              Consolidated grades
+            </Link>
+          )}
+          {canEdit && <DeleteClassDialog classId={cls.id} className={cls.name} />}
+        </div>
       </div>
 
       {canEdit && (

@@ -3,13 +3,7 @@
 import { useActionState } from "react";
 import { addSubject, type ActionState } from "./actions";
 
-export function AddSubjectForm({
-  gradeLevelId,
-  gradingGroups,
-}: {
-  gradeLevelId: string;
-  gradingGroups: { key: string; label: string }[];
-}) {
+export function AddSubjectForm({ gradeLevelId }: { gradeLevelId: string }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(
     (prev, formData) => addSubject(formData),
     {}
@@ -56,29 +50,6 @@ export function AddSubjectForm({
           step={1}
           defaultValue={1}
           className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
-        />
-      </label>
-      <label className="sm:col-span-2">
-        <span className="text-xs text-muted">Grading group</span>
-        <select
-          name="gradingGroup"
-          defaultValue=""
-          className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
-        >
-          <option value="">Not set</option>
-          {gradingGroups.map((g) => (
-            <option key={g.key} value={g.key}>
-              {g.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="sm:col-span-2">
-        <span className="text-xs text-muted">Learning area (only for subjects graded in parts)</span>
-        <input
-          name="learningArea"
-          placeholder="e.g. Effective Communication"
-          className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-subtle focus:border-accent focus:outline-none"
         />
       </label>
       <button

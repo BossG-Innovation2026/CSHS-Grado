@@ -18,8 +18,6 @@ export interface SubjectRow {
   title: string;
   terms: number;
   creditUnits: number;
-  gradingGroup: string | null;
-  learningArea: string | null;
 }
 
 /* Reads: only callable from server code; each one re-checks module access. */
@@ -47,8 +45,6 @@ export async function listSubjects(gradeLevelId: string): Promise<SubjectRow[]> 
       title: subject.title,
       terms: subject.terms,
       creditUnits: subject.creditUnits,
-      gradingGroup: subject.gradingGroup,
-      learningArea: subject.learningArea,
     })
     .from(subject)
     .where(eq(subject.gradeLevelId, gradeLevelId))

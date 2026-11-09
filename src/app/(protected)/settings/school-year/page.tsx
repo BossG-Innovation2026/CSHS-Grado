@@ -1,5 +1,4 @@
 import { requireAdmin } from "@/lib/access";
-import { POLICY_LABELS } from "@/lib/grading";
 import { listSchoolYears } from "@/server/school-years";
 import { AddSchoolYearForm, SetCurrentYearForm, TermDatesForm } from "./school-year-forms";
 
@@ -13,7 +12,7 @@ export default async function SchoolYearsPage() {
     <div className="max-w-3xl">
       <h1 className="text-xl font-bold text-foreground">School Years</h1>
       <p className="mt-1 text-sm text-muted">
-        New classes join the current school year. Its grading rules follow DepEd Order 015, s. 2026.
+        New classes join the current school year.
       </p>
 
       <div className="mt-6 rounded-lg border border-border bg-surface p-4">
@@ -34,7 +33,7 @@ export default async function SchoolYearsPage() {
                 )}
               </h2>
               <p className="mt-0.5 text-xs text-muted">
-                {year.startsOn} to {year.endsOn} · {POLICY_LABELS[year.policyKey]}
+                {year.startsOn} to {year.endsOn}
               </p>
             </div>
             {!year.isCurrent && <SetCurrentYearForm id={year.id} />}

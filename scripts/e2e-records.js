@@ -144,7 +144,7 @@ async function enroll(page, classId, surname, firstname) {
   await page.waitForURL("**/curriculum", { timeout: 15000 });
   check("grade level delete works with the password", !(await levelExists()));
 
-  // School years and curriculum grouping (the current year comes from a migration).
+  // School years (the current year comes from a migration).
   const NEW_YEAR = "2099-2100";
   await db.query("DELETE FROM school_year WHERE id = $1", [NEW_YEAR]);
   await page.goto(`${BASE}/settings/school-year`);
@@ -154,8 +154,8 @@ async function enroll(page, classId, surname, firstname) {
   await page.locator('input[name="endsOn"]').first().fill("2100-04-01");
   await page.getByRole("button", { name: "Add school year" }).click();
   await page.getByText(`SY ${NEW_YEAR}`).waitFor({ timeout: 15000 });
-  const added = await db.query("SELECT policy_key, is_current FROM school_year WHERE id = $1", [NEW_YEAR]);
-  check("new school year uses zero-based grading", added.rows[0]?.policy_key === "zero-based" && !added.rows[0].is_current);
+  const added = await db.query("SELECT is_current FROM school_year WHERE id = $1", [NEW_YEAR]);
+  check("new school year is added but not current", added.rowCount === 1 && !added.rows[0].is_current);
   const terms = await db.query("SELECT 1 FROM school_year_term WHERE school_year_id = $1", [NEW_YEAR]);
   check("new school year gets three terms", terms.rowCount === 3);
 
@@ -167,31 +167,6 @@ async function enroll(page, classId, surname, firstname) {
   check("term dates save", term1.rows[0]?.d === "2099-06-01", term1.rows[0]?.d);
   await db.query("DELETE FROM school_year WHERE id = $1", [NEW_YEAR]);
 
-  const code = `E2E${STAMP}`;
-  const subjectId = randomUUID();
-  await db.query("INSERT INTO subject (id, grade_level_id, code, title) VALUES ($1, 'grade-11', $2, 'E2E Subject')", [subjectId, code]);
-  await db.query(
-    "INSERT INTO class_subject (id, class_id, subject_id, code, title, term) VALUES ($1, $2, $3, $4, 'E2E Subject', 1)",
-    [randomUUID(), classA, subjectId, code]
-  );
-  await page.goto(`${BASE}/curriculum/grade-11`);
-  await page.locator("tbody tr", { hasText: code }).locator('select[name="gradingGroup"]').selectOption("core");
-  await page.waitForFunction(
-    (c) => [...document.querySelectorAll("tbody tr")].find((r) => r.textContent.includes(c))?.querySelector("select")?.value === "core",
-    code,
-    { timeout: 15000 }
-  );
-  await page.waitForTimeout(1500);
-  const saved = await db.query("SELECT grading_group FROM subject WHERE id = $1", [subjectId]);
-  check("subject grading group saves", saved.rows[0]?.grading_group === "core", saved.rows[0]?.grading_group);
-  const snapshot = await db.query("SELECT grading_group FROM class_subject WHERE subject_id = $1", [subjectId]);
-  check("class subjects pick up the grading group", snapshot.rows[0]?.grading_group === "core");
-  await page.reload();
-  const shown = await page.locator("tbody tr", { hasText: code }).locator('select[name="gradingGroup"]').inputValue();
-  check("grading group still shown after reload", shown === "core", shown);
-  const do8 = await page.goto(`${BASE}/curriculum/grade-12`);
-  body = await page.locator('select[name="gradingGroup"]').first().innerText();
-  check("Grade 12 offers DO 8 groups", do8.ok() && body.includes("Academic track") && !body.includes("TechPro"));
 
   await browser.close();
   await db.end();

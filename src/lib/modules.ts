@@ -70,7 +70,7 @@ export const NAV_LINKS: {
   { module: "accounts", href: "/settings/school-year", label: "School Years", implemented: true },
   { module: "curriculum", href: "/curriculum", label: "Curriculum Setup", implemented: true },
   { module: "classes", href: "/classes", label: "Classes", implemented: true },
-  { module: "grades_submit", href: "/grades", label: "Grade Submission", implemented: false },
+  { module: "grades_submit", href: "/grades", label: "Grade Submission", implemented: true },
   { module: "grades_approve", href: "/grades/approval", label: "Grades Approval", implemented: false },
   { module: "registrar", href: "/registrar", label: "Records & Forms", implemented: false },
   { module: "codes", href: "/codes", label: "Access Codes", implemented: false },

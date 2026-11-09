@@ -12,9 +12,11 @@ import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  check,
   date,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   smallint,
@@ -137,7 +139,7 @@ export const schoolSettings = pgTable("school_settings", {
 /* Curriculum                                                          */
 /* ------------------------------------------------------------------ */
 
-/** A school year and the grading rules that apply to it. */
+/** A school year; exactly one is current. */
 export const schoolYear = pgTable(
   "school_year",
   {
@@ -145,7 +147,6 @@ export const schoolYear = pgTable(
     startsOn: date("starts_on", { mode: "string" }).notNull(),
     endsOn: date("ends_on", { mode: "string" }).notNull(),
     isCurrent: boolean("is_current").notNull().default(false),
-    policyKey: text("policy_key").notNull(),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("school_year_current_uq").on(t.isCurrent).where(sql`${t.isCurrent}`)]
@@ -183,10 +184,6 @@ export const subject = pgTable(
     title: text("title").notNull(),
     terms: smallint("terms").notNull().default(1),
     creditUnits: smallint("credit_units").notNull().default(1),
-    /** Key from GRADING_GROUPS; grades cannot start while this is NULL. */
-    gradingGroup: text("grading_group"),
-    /** Groups parts graded as one learning area, e.g. Effective Communication. */
-    learningArea: text("learning_area"),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
   (t) => [
@@ -215,7 +212,6 @@ export const schoolClass = pgTable(
       .notNull()
       .default("2026-2027")
       .references(() => schoolYear.id, { onDelete: "restrict" }),
-    curriculum: text("curriculum").notNull().default("strengthened"),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
   (t) => [
@@ -245,8 +241,6 @@ export const classSubject = pgTable(
     description: text("description").notNull().default(""),
     teacherId: text("teacher_id").references(() => user.id, { onDelete: "set null" }),
     term: smallint("term").notNull().default(1),
-    gradingGroup: text("grading_group"),
-    creditUnits: smallint("credit_units").notNull().default(1),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
   (t) => [
@@ -287,6 +281,60 @@ export const enrollment = pgTable(
     uniqueIndex("enrollment_class_student_uq").on(t.classId, t.studentId),
     index("enrollment_student_idx").on(t.studentId),
   ]
+);
+
+/* ------------------------------------------------------------------ */
+/* Final grades: entered by teachers, never computed here               */
+/* ------------------------------------------------------------------ */
+
+/** Workflow state of one subject-term; no row means draft. */
+export const gradeSubmission = pgTable("grade_submission", {
+  classSubjectId: text("class_subject_id")
+    .primaryKey()
+    .references(() => classSubject.id, { onDelete: "restrict" }),
+  status: text("status").notNull().default("draft"), // draft, submitted, approved, returned
+  submittedBy: text("submitted_by").references(() => user.id, { onDelete: "set null" }),
+  submittedAt: timestamptz("submitted_at"),
+  decidedBy: text("decided_by").references(() => user.id, { onDelete: "set null" }),
+  decidedAt: timestamptz("decided_at"),
+  returnNote: text("return_note"),
+});
+
+/** One learner's final grade in one subject-term (class_subject is per term). */
+export const finalGrade = pgTable(
+  "final_grade",
+  {
+    // Restrict: grades must not disappear when a class is deleted (DO 015 para. 61).
+    classSubjectId: text("class_subject_id")
+      .notNull()
+      .references(() => classSubject.id, { onDelete: "restrict" }),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => student.id, { onDelete: "restrict" }),
+    grade: smallint("grade").notNull(),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.classSubjectId, t.studentId] }),
+    index("final_grade_student_idx").on(t.studentId),
+    check("final_grade_range", sql`${t.grade} between 60 and 100`),
+  ]
+);
+
+/** Append-only record of changes to grades. No foreign keys, so it outlives what it describes. */
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: text("id").primaryKey(),
+    at: timestamptz("at").notNull().defaultNow(),
+    actorId: text("actor_id").notNull(),
+    action: text("action").notNull(),
+    entity: text("entity").notNull(),
+    entityId: text("entity_id").notNull(),
+    detail: jsonb("detail"),
+  },
+  (t) => [index("audit_log_entity_idx").on(t.entity, t.entityId)]
 );
 
 /** Tables better-auth's Drizzle adapter needs, keyed by model name. */

@@ -3,7 +3,6 @@
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb, schema } from "@/db";
-import { policyKeyForYear } from "@/lib/grading";
 import { TERMS } from "@/lib/terms";
 import { adminUser, checkOwnPassword } from "@/server/guards";
 
@@ -46,7 +45,7 @@ export async function addSchoolYear(_prev: ActionState, formData: FormData): Pro
   const created = await getDb().transaction(async (tx) => {
     const inserted = await tx
       .insert(schoolYear)
-      .values({ id, startsOn, endsOn, isCurrent: false, policyKey: policyKeyForYear(startYear) })
+      .values({ id, startsOn, endsOn, isCurrent: false })
       .onConflictDoNothing({ target: schoolYear.id })
       .returning({ id: schoolYear.id });
     if (inserted.length === 0) return false;

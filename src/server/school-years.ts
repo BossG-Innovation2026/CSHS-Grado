@@ -2,7 +2,6 @@ import "server-only";
 import { asc, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireAdmin } from "@/lib/access";
-import type { PolicyKey } from "@/lib/grading";
 
 const { schoolYear, schoolYearTerm } = schema;
 
@@ -11,7 +10,6 @@ export interface SchoolYearRow {
   startsOn: string;
   endsOn: string;
   isCurrent: boolean;
-  policyKey: PolicyKey;
 }
 
 export interface SchoolYearTermRow {
@@ -26,7 +24,6 @@ const yearColumns = {
   startsOn: schoolYear.startsOn,
   endsOn: schoolYear.endsOn,
   isCurrent: schoolYear.isCurrent,
-  policyKey: schoolYear.policyKey,
 };
 
 export async function listSchoolYears(): Promise<(SchoolYearRow & { terms: SchoolYearTermRow[] })[]> {
@@ -38,7 +35,6 @@ export async function listSchoolYears(): Promise<(SchoolYearRow & { terms: Schoo
   ]);
   return years.map((year) => ({
     ...year,
-    policyKey: year.policyKey as PolicyKey,
     terms: terms
       .filter((t) => t.schoolYearId === year.id)
       .map((t) => ({
@@ -56,5 +52,5 @@ export async function listSchoolYears(): Promise<(SchoolYearRow & { terms: Schoo
 export async function findCurrentSchoolYear(): Promise<SchoolYearRow> {
   const [year] = await getDb().select(yearColumns).from(schoolYear).where(eq(schoolYear.isCurrent, true)).limit(1);
   if (!year) throw new Error("No current school year is set.");
-  return { ...year, policyKey: year.policyKey as PolicyKey };
+  return year;
 }

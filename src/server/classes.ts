@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, count, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireModule } from "@/lib/access";
-import { isAdmin, ROLE_DEPARTMENT_HEAD, ROLE_REGISTRAR, ROLE_SCHOOL_HEAD } from "@/lib/modules";
+import { can, isAdmin, ROLE_DEPARTMENT_HEAD, ROLE_REGISTRAR, ROLE_SCHOOL_HEAD } from "@/lib/modules";
 import type { SessionUser } from "@/lib/session";
 import { findCurrentSchoolYear } from "@/server/school-years";
 
@@ -88,13 +88,17 @@ export async function listClassSubjects(classId: string, term: number): Promise<
     .orderBy(sql`lower(${classSubject.title})`);
 }
 
+/** Teachers, plus other staff (such as Department Heads) who can submit grades. */
 export async function listActiveTeachers(): Promise<{ id: string; name: string }[]> {
   await requireModule("classes");
-  return getDb()
-    .select({ id: user.id, name: user.name })
+  const rows = await getDb()
+    .select({ id: user.id, name: user.name, role: user.role, permissions: user.permissions })
     .from(user)
-    .where(and(eq(user.role, "teacher"), eq(user.active, true)))
+    .where(eq(user.active, true))
     .orderBy(sql`lower(${user.name})`);
+  return rows
+    .filter((u) => !isAdmin(u) && (u.role === "teacher" || can(u, "grades_submit")))
+    .map(({ id, name }) => ({ id, name }));
 }
 
 export async function listGradeLevelsForClasses(): Promise<{ id: string; name: string }[]> {
