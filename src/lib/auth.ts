@@ -11,6 +11,8 @@ function createAuth(db: Db) {
     baseURL: getEnvVar("BETTER_AUTH_URL") ?? "http://localhost:3000",
     emailAndPassword: {
       enabled: true,
+      // Accounts are created by a System Admin; the very first one by /register.
+      disableSignUp: true,
     },
     user: {
       additionalFields: {
@@ -36,6 +38,13 @@ function createAuth(db: Db) {
     },
     session: {
       expiresIn: 60 * 60 * 24 * 7,
+    },
+    advanced: {
+      ipAddress: {
+        // Cloudflare sets cf-connecting-ip itself, so clients cannot forge it.
+        // x-forwarded-for only matters outside Cloudflare (local, CI).
+        ipAddressHeaders: ["cf-connecting-ip", "x-forwarded-for"],
+      },
     },
     rateLimit: {
       // Counters live in Postgres so the limit holds across Worker isolates

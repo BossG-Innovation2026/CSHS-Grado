@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { requireModule } from "@/lib/access";
 import { listClasses } from "@/server/classes";
+import { findCurrentSchoolYear } from "@/server/school-years";
 
 export const dynamic = "force-dynamic";
 
 export default async function ClassesPage() {
   await requireModule("classes");
-  const classes = await listClasses();
+  const [classes, year] = await Promise.all([listClasses(), findCurrentSchoolYear()]);
 
   return (
     <div>
@@ -14,7 +15,7 @@ export default async function ClassesPage() {
         <div>
           <h1 className="text-xl font-bold text-foreground">Class Creation</h1>
           <p className="mt-1 text-sm text-muted">
-            Sections with their adviser and subject teachers.
+            SY {year.id} sections with their adviser and subject teachers.
           </p>
         </div>
         <Link

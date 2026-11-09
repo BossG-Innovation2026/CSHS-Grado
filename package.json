@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "check": "npm run typecheck && npm run lint",
+    "test": "node --test \"src/**/*.test.ts\"",
     "db:dev": "node scripts/dev-db.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file-if-exists=.env.local node_modules/drizzle-kit/bin.cjs migrate",
@@ -21,10 +22,10 @@
     "db:seed-demo": "node --env-file-if-exists=.env.local scripts/seed-demo.mjs"
   },
   "dependencies": {
-    "better-auth": "^1.6.26",
+    "better-auth": "^1.7.18",
     "drizzle-orm": "^0.45.4",
     "lucide-react": "^1.31.0",
-    "next": "16.3.0",
+    "next": "16.4.5",
     "pg": "^8.23.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -35,7 +36,7 @@
     "@cloudflare/workers-types": "^5.20260810.1",
     "@electric-sql/pglite": "^0.5.15",
     "@electric-sql/pglite-socket": "^0.2.18",
-    "@opennextjs/cloudflare": "^1.20.2",
+    "@opennextjs/cloudflare": "^1.20.16",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^24.13.3",
     "@types/pg": "^8.23.1",
@@ -43,12 +44,12 @@
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9",
-    "eslint-config-next": "16.3.0",
+    "eslint-config-next": "16.4.5",
     "playwright": "^1.62.1",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "workerd": "1.20260804.1",
-    "wrangler": "^4.120.1"
+    "workerd": "1.20261104.1",
+    "wrangler": "^4.158.0"
   },
   "engines": {
     "node": ">=22.12"

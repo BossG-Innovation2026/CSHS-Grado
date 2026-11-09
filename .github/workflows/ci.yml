@@ -23,6 +23,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
+      - run: npm test
       - run: npx opennextjs-cloudflare build
 
   e2e:
@@ -69,3 +70,7 @@ jobs:
         run: node scripts/e2e-m1.js
       - name: E2E - password-confirmed class changes
         run: node scripts/verify-passwords.js
+      - name: E2E - student records and grade-level deletion
+        run: node scripts/e2e-records.js
+      - name: E2E - score entry and submission
+        run: node scripts/e2e-grades.js

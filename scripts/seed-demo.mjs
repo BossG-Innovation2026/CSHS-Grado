@@ -48,7 +48,7 @@ try {
 
   await client.query("BEGIN");
   if (reset) {
-    await client.query('TRUNCATE enrollment, student, class_subject, class, subject, session, account, verification, rate_limit, notification, "user" CASCADE');
+    await client.query('TRUNCATE audit_log, final_grade, grade_submission, enrollment, student, class_subject, class, subject, session, account, verification, rate_limit, notification, "user" CASCADE');
     console.log("reset: demo data wiped");
   }
 
@@ -116,12 +116,15 @@ try {
       [randomUUID(), c.name, c.grade, c.adviser]
     );
     const classId = cls.rows[0].id;
+    const classSubjects = [];
+    const studentIds = [];
     for (const [i, [code, title]] of SUBJECTS[c.grade].entries()) {
-      await client.query(
+      const saved = await client.query(
         `INSERT INTO class_subject (id, class_id, subject_id, code, title, teacher_id, term)
-         VALUES ($1, $2, $3, $4, $5, $6, 1) ON CONFLICT (class_id, code, term) DO NOTHING`,
+         VALUES ($1, $2, $3, $4, $5, $6, 1) ON CONFLICT (class_id, code, term) DO UPDATE SET teacher_id = excluded.teacher_id RETURNING id`,
         [randomUUID(), classId, subjectIds[`${c.grade}:${code}`], code, title, c.teachers[i % 2]]
       );
+      classSubjects.push(saved.rows[0].id);
     }
     for (let i = 0; i < c.students; i++) {
       const lrn = String(c.lrnBase + i);
@@ -134,7 +137,30 @@ try {
         `INSERT INTO enrollment (id, class_id, student_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
         [randomUUID(), classId, s.rows[0].id]
       );
+      studentIds.push(s.rows[0].id);
       studentCount += 1;
+    }
+
+    // Examples for each role: subjects 0 and 2 submitted, 1 complete draft, 3 partly entered.
+    for (const [index, state] of [[0, "submitted"], [1, "draft"], [2, "submitted"], [3, "partial"]]) {
+      const classSubjectId = classSubjects[index];
+      if (!classSubjectId) continue;
+      const teacher = c.teachers[index % 2];
+      for (const [s, studentId] of studentIds.entries()) {
+        if (state === "partial" && s % 2) continue;
+        await client.query(
+          `INSERT INTO final_grade (class_subject_id, student_id, grade, updated_by)
+           VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+          [classSubjectId, studentId, 72 + ((s * 7 + index * 3) % 28), teacher]
+        );
+      }
+      if (state === "submitted") {
+        await client.query(
+          `INSERT INTO grade_submission (class_subject_id, status, submitted_by, submitted_at)
+           VALUES ($1, 'submitted', $2, now()) ON CONFLICT DO NOTHING`,
+          [classSubjectId, teacher]
+        );
+      }
     }
   }
 

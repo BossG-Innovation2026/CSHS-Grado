@@ -2,8 +2,9 @@ import "server-only";
 import { and, asc, count, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireModule } from "@/lib/access";
-import { isAdmin } from "@/lib/modules";
+import { can, isAdmin, ROLE_DEPARTMENT_HEAD, ROLE_REGISTRAR, ROLE_SCHOOL_HEAD } from "@/lib/modules";
 import type { SessionUser } from "@/lib/session";
+import { findCurrentSchoolYear } from "@/server/school-years";
 
 const { schoolClass, classSubject, gradeLevel, subject, user, student, enrollment } = schema;
 
@@ -14,6 +15,7 @@ export interface ClassRow {
   gradeLevelName: string;
   adviserId: string;
   adviserName: string;
+  schoolYearId: string;
 }
 
 export interface ClassSubjectRow {
@@ -44,17 +46,20 @@ const classColumns = {
   gradeLevelName: gradeLevel.name,
   adviserId: schoolClass.adviserId,
   adviserName: user.name,
+  schoolYearId: schoolClass.schoolYearId,
 };
 
 /* Reads: only callable from server code; each one re-checks module access. */
 
 export async function listClasses(): Promise<ClassRow[]> {
   await requireModule("classes");
+  const year = await findCurrentSchoolYear();
   return getDb()
     .select(classColumns)
     .from(schoolClass)
     .innerJoin(gradeLevel, eq(gradeLevel.id, schoolClass.gradeLevelId))
     .innerJoin(user, eq(user.id, schoolClass.adviserId))
+    .where(eq(schoolClass.schoolYearId, year.id))
     .orderBy(asc(gradeLevel.sortOrder), sql`lower(${schoolClass.name})`);
 }
 
@@ -83,13 +88,17 @@ export async function listClassSubjects(classId: string, term: number): Promise<
     .orderBy(sql`lower(${classSubject.title})`);
 }
 
+/** Teachers, plus other staff (such as Department Heads) who can submit grades. */
 export async function listActiveTeachers(): Promise<{ id: string; name: string }[]> {
   await requireModule("classes");
-  return getDb()
-    .select({ id: user.id, name: user.name })
+  const rows = await getDb()
+    .select({ id: user.id, name: user.name, role: user.role, permissions: user.permissions })
     .from(user)
-    .where(and(eq(user.role, "teacher"), eq(user.active, true)))
+    .where(eq(user.active, true))
     .orderBy(sql`lower(${user.name})`);
+  return rows
+    .filter((u) => !isAdmin(u) && (u.role === "teacher" || can(u, "grades_submit")))
+    .map(({ id, name }) => ({ id, name }));
 }
 
 export async function listGradeLevelsForClasses(): Promise<{ id: string; name: string }[]> {
@@ -100,11 +109,13 @@ export async function listGradeLevelsForClasses(): Promise<{ id: string; name: s
     .orderBy(asc(gradeLevel.sortOrder));
 }
 
-export async function countClassesByGrade(): Promise<Record<string, number>> {
+/** Classes per grade level, in one school year or across all of them. */
+export async function countClassesByGrade(schoolYearId?: string): Promise<Record<string, number>> {
   await requireModule("classes");
   const rows = await getDb()
     .select({ gradeLevelId: schoolClass.gradeLevelId, count: count() })
     .from(schoolClass)
+    .where(schoolYearId ? eq(schoolClass.schoolYearId, schoolYearId) : undefined)
     .groupBy(schoolClass.gradeLevelId);
   return Object.fromEntries(rows.map((r) => [r.gradeLevelId, Number(r.count)]));
 }
@@ -120,8 +131,10 @@ export async function listSubjectsByGrade(
     .orderBy(sql`lower(${subject.title})`);
 }
 
-export async function listStudents(classId: string): Promise<StudentRow[]> {
-  await requireModule("classes");
+/** The class's enrolled students, or null when the caller may not see them. */
+export async function listStudents(classId: string): Promise<StudentRow[] | null> {
+  const actor = await requireModule("classes");
+  if (!(await canViewRoster(actor, classId))) return null;
   return getDb()
     .select({
       id: student.id,
@@ -148,6 +161,22 @@ export async function findClass(id: string): Promise<ClassRow | undefined> {
     .where(eq(schoolClass.id, id))
     .limit(1);
   return row;
+}
+
+/**
+ * Student names and LRNs: school-level staff, the adviser, and the class's
+ * subject teachers. Department Heads are school-level until classes can be
+ * assigned to them (grades workflow).
+ */
+export async function canViewRoster(actor: SessionUser, classId: string): Promise<boolean> {
+  if ([ROLE_SCHOOL_HEAD, ROLE_REGISTRAR, ROLE_DEPARTMENT_HEAD].includes(actor.role)) return true;
+  if (await canManageClass(actor, classId)) return true;
+  const [row] = await getDb()
+    .select({ id: classSubject.id })
+    .from(classSubject)
+    .where(and(eq(classSubject.classId, classId), eq(classSubject.teacherId, actor.id)))
+    .limit(1);
+  return Boolean(row);
 }
 
 /** Admins manage every class; everyone else only the classes they advise. */

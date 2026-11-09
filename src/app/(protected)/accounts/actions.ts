@@ -12,7 +12,7 @@ import { findAccount } from "@/server/accounts";
 
 export type { AccountRow } from "@/server/accounts";
 
-const { user, account } = schema;
+const { user, account, session } = schema;
 
 export interface ActionState {
   error?: string;
@@ -96,10 +96,14 @@ export async function resetPassword(id: string, _prev: ActionState, formData: Fo
   if (password.length < 8) return { error: "Password must be at least 8 characters." };
 
   const passwordHash = await hashPassword(password);
-  await getDb()
-    .update(account)
-    .set({ password: passwordHash, updatedAt: new Date() })
-    .where(and(eq(account.providerId, "credential"), eq(account.userId, id)));
+  await getDb().transaction(async (tx) => {
+    await tx
+      .update(account)
+      .set({ password: passwordHash, updatedAt: new Date() })
+      .where(and(eq(account.providerId, "credential"), eq(account.userId, id)));
+    // A reset often follows a compromise: sign the account out everywhere.
+    await tx.delete(session).where(eq(session.userId, id));
+  });
   return { ok: true };
 }
 

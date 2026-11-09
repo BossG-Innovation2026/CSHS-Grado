@@ -9,6 +9,7 @@ import {
   listStudents,
   listSubjectsByGrade,
 } from "@/server/classes";
+import { canViewConsolidated } from "@/server/grades";
 import { RenameClassForm } from "../rename-class-form";
 import { AddClassSubjectForm } from "../add-class-subject-form";
 import { EnrollStudentForm } from "../enroll-student-form";
@@ -44,11 +45,12 @@ export default async function ClassDetailPage({
   }
 
   const term = TERMS.includes(Number(termParam) as Term) ? (Number(termParam) as Term) : 1;
-  const [subjects, teachers, students, curriculumSubjects] = await Promise.all([
+  const [subjects, teachers, students, curriculumSubjects, showConsolidated] = await Promise.all([
     listClassSubjects(id, term),
     listActiveTeachers(),
     listStudents(id),
     listSubjectsByGrade(cls.gradeLevelId),
+    canViewConsolidated(user, id),
   ]);
 
   const canEdit = isAdmin(user) || cls.adviserId === user.id;
@@ -64,10 +66,18 @@ export default async function ClassDetailPage({
         <div>
           <h1 className="text-xl font-bold text-foreground">{cls.name}</h1>
           <p className="mt-1 text-sm text-muted">
-            {cls.gradeLevelName} · Adviser: <span className="text-foreground">{cls.adviserName}</span>
+            {cls.gradeLevelName} · Adviser: <span className="text-foreground">{cls.adviserName}</span> · SY{" "}
+            {cls.schoolYearId}
           </p>
         </div>
-        {canEdit && <DeleteClassDialog classId={cls.id} className={cls.name} />}
+        <div className="flex items-center gap-3">
+          {showConsolidated && (
+            <Link href={`/classes/${cls.id}/grades`} className="text-sm text-accent-strong hover:underline">
+              Consolidated grades
+            </Link>
+          )}
+          {canEdit && <DeleteClassDialog classId={cls.id} className={cls.name} />}
+        </div>
       </div>
 
       {canEdit && (
@@ -204,7 +214,7 @@ export default async function ClassDetailPage({
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {students.map((s) => (
+            {(students ?? []).map((s) => (
               <tr key={s.id}>
                 <td className="px-4 py-3 font-medium text-accent-strong">{s.lrn}</td>
                 <td className="px-4 py-3 text-foreground">{s.surname}</td>
@@ -218,10 +228,12 @@ export default async function ClassDetailPage({
                 </td>
               </tr>
             ))}
-            {students.length === 0 && (
+            {(students === null || students.length === 0) && (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-subtle">
-                  No students enrolled yet.
+                  {students === null
+                    ? "Only this class's adviser, its subject teachers, and school-level staff can see its students."
+                    : "No students enrolled yet."}
                 </td>
               </tr>
             )}

@@ -21,7 +21,7 @@ npm run db:migrate      # terminal 2: create tables
 npm run dev             # http://localhost:3000
 ```
 
-The first account registered at `/register` becomes System Admin.
+The first account registered at `/register` becomes System Admin; after that the page is closed and System Admins create accounts.
 Optional demo data: `npm run db:seed-dev` (a teacher and the class "Grade 11 - B").
 Prefer a real Postgres? `docker compose up -d` instead of `npm run db:dev`, and remove
 `DATABASE_POOL_MAX` from `.env.local`.
