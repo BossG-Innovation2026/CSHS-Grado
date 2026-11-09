@@ -170,6 +170,10 @@ export const schoolClass = pgTable(
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
+    /** Track/strand offered by the section, e.g. "ICT" or "HUMSS". */
+    strand: text("strand").notNull().default(""),
+    /** School year the section belongs to, e.g. "2026-2027". */
+    schoolYear: text("school_year").notNull().default(""),
     gradeLevelId: text("grade_level_id")
       .notNull()
       .references(() => gradeLevel.id, { onDelete: "cascade" }),
@@ -202,6 +206,14 @@ export const classSubject = pgTable(
     description: text("description").notNull().default(""),
     teacherId: text("teacher_id").references(() => user.id, { onDelete: "set null" }),
     term: smallint("term").notNull().default(1),
+    /**
+     * Weight of each assessment component in the final grade, in percent.
+     * DepEd weights differ per subject group (e.g. 30/50/20 or 40/40/20),
+     * so they are stored per offering and must total 100.
+     */
+    wwWeight: smallint("ww_weight").notNull().default(30),
+    ptWeight: smallint("pt_weight").notNull().default(50),
+    otherWeight: smallint("other_weight").notNull().default(20),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
   (t) => [
@@ -293,6 +305,14 @@ export const grade = pgTable(
       .references(() => student.id, { onDelete: "cascade" }),
     /** DepEd scale 60–100; NULL means "not yet encoded". */
     value: integer("value"),
+    /**
+     * Assessment components, each a percentage (0–100). When all three are
+     * present the final `value` is derived from them using the offering's
+     * weights; they are optional so a single final grade can still be encoded.
+     */
+    writtenWork: integer("written_work"),
+    performanceTask: integer("performance_task"),
+    otherAssessment: integer("other_assessment"),
     updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
     updatedAt: timestamptz("updated_at").notNull().defaultNow(),
   },

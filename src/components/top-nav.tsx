@@ -25,6 +25,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { SignOutButton } from "@/components/sign-out-button";
+import { NotificationsMenu } from "@/components/notifications-menu";
+import type { NotificationRow } from "@/server/notifications";
 
 const MODULE_ICONS: Record<string, LucideIcon> = {
   accounts: Users,
@@ -63,6 +65,8 @@ export function TopNav({
   links,
   isDemo,
   canSearch,
+  notifications,
+  unreadNotifications,
 }: {
   userName: string;
   userEmail: string;
@@ -70,6 +74,8 @@ export function TopNav({
   links: NavLink[];
   isDemo: boolean;
   canSearch: boolean;
+  notifications: NotificationRow[];
+  unreadNotifications: number;
 }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -194,6 +200,8 @@ export function TopNav({
               </button>
             </form>
           )}
+
+          <NotificationsMenu notifications={notifications} unread={unreadNotifications} />
 
           <SignOutButton compact />
 

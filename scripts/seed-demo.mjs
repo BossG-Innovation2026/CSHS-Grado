@@ -111,17 +111,53 @@ try {
     }
   }
 
-  // Classes, their Term 1 subjects and fake students.
-  // Grade 11 - A: the Class Adviser also teaches some of its subjects.
-  // Grade 12 - A: advised by Reyes; the Subject Teacher teaches in both classes.
+  // Four sections across Grades 11 and 12, each offered in all three terms.
+  // The demo Adviser and Subject Teacher both teach across the sections so a
+  // single teacher dashboard has plenty of class cards.
   const adviser = ids["adviser@demo.grado"];
   const subjectTeacher = ids["teacher@demo.grado"];
   const reyes = ids["reyes@demo.grado"];
+  const cruz = ids["cruz@demo.grado"];
+  const santos = ids["santos@demo.grado"];
   const registrar = ids["registrar@demo.grado"];
   const parent = ids["parent@demo.grado"];
   const classes = [
-    { grade: "grade-11", name: "Grade 11 - A", adviser, teachers: [adviser, subjectTeacher], students: 20, lrnBase: 900000000100 },
-    { grade: "grade-12", name: "Grade 12 - A", adviser: reyes, teachers: [subjectTeacher, reyes], students: 15, lrnBase: 900000000200 },
+    {
+      grade: "grade-11",
+      name: "Grade 11 - ICT A",
+      strand: "ICT",
+      adviser,
+      teachers: [adviser, subjectTeacher],
+      students: 20,
+      lrnBase: 900000000100,
+    },
+    {
+      grade: "grade-11",
+      name: "Grade 11 - HUMSS A",
+      strand: "HUMSS",
+      adviser: reyes,
+      teachers: [subjectTeacher, adviser],
+      students: 18,
+      lrnBase: 900000000300,
+    },
+    {
+      grade: "grade-12",
+      name: "Grade 12 - ICT B",
+      strand: "ICT",
+      adviser: cruz,
+      teachers: [adviser, subjectTeacher],
+      students: 15,
+      lrnBase: 900000000500,
+    },
+    {
+      grade: "grade-12",
+      name: "Grade 12 - HUMSS B",
+      strand: "HUMSS",
+      adviser: santos,
+      teachers: [subjectTeacher, adviser],
+      students: 14,
+      lrnBase: 900000000700,
+    },
   ];
   const classIds = {};
   const studentsByClass = {};
@@ -129,33 +165,43 @@ try {
 
   for (const c of classes) {
     const cls = await client.query(
-      `INSERT INTO class (id, name, grade_level_id, adviser_id) VALUES ($1, $2, $3, $4)
-       ON CONFLICT (grade_level_id, name) DO UPDATE SET adviser_id = excluded.adviser_id RETURNING id`,
-      [randomUUID(), c.name, c.grade, c.adviser]
+      `INSERT INTO class (id, name, strand, school_year, grade_level_id, adviser_id)
+       VALUES ($1, $2, $3, '2026-2027', $4, $5)
+       ON CONFLICT (grade_level_id, name) DO UPDATE SET adviser_id = excluded.adviser_id,
+         strand = excluded.strand, school_year = excluded.school_year
+       RETURNING id`,
+      [randomUUID(), c.name, c.strand, c.grade, c.adviser]
     );
     const classId = cls.rows[0].id;
-    classIds[c.grade] = classId;
+    classIds[c.name] = classId;
     studentsByClass[classId] = [];
 
-    for (const [i, [code, title]] of SUBJECTS[c.grade].entries()) {
-      const teacherId = c.teachers[i % 2];
-      const cs = await client.query(
-        `INSERT INTO class_subject (id, class_id, subject_id, code, title, teacher_id, term)
-         VALUES ($1, $2, $3, $4, $5, $6, 1)
-         ON CONFLICT (class_id, code, term) DO UPDATE SET title = excluded.title, teacher_id = excluded.teacher_id
-         RETURNING id`,
-        [randomUUID(), classId, subjectIds[`${c.grade}:${code}`], code, title, teacherId]
-      );
-      offerings.push({
-        id: cs.rows[0].id,
-        classId,
-        code,
-        title,
-        term: 1,
-        status: STATUSES[i % STATUSES.length],
-        teacherId,
-        adviserId: c.adviser,
-      });
+    // Every subject is offered in all three terms, so the dashboard can filter
+    // Term 1 / 2 / 3 and each sheet has its own workflow state.
+    for (const term of [1, 2, 3]) {
+      for (const [i, [code, title]] of SUBJECTS[c.grade].entries()) {
+        const teacherId = c.teachers[(i + term) % 2];
+        const cs = await client.query(
+          `INSERT INTO class_subject (id, class_id, subject_id, code, title, teacher_id, term,
+             ww_weight, pt_weight, other_weight)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 30, 50, 20)
+           ON CONFLICT (class_id, code, term) DO UPDATE SET title = excluded.title,
+             teacher_id = excluded.teacher_id
+           RETURNING id`,
+          [randomUUID(), classId, subjectIds[`${c.grade}:${code}`], code, title, teacherId, term]
+        );
+        offerings.push({
+          id: cs.rows[0].id,
+          classId,
+          className: c.name,
+          code,
+          title,
+          term,
+          status: STATUSES[(i + term - 1) % STATUSES.length],
+          teacherId,
+          adviserId: c.adviser,
+        });
+      }
     }
 
     for (let i = 0; i < c.students; i++) {
@@ -164,7 +210,7 @@ try {
       const firstname = FIRST[(i * 3) % FIRST.length];
       const birthYear = c.grade === "grade-11" ? 2008 : 2007;
       const birthDate = `${birthYear}-${String((i % 12) + 1).padStart(2, "0")}-${String((i % 27) + 1).padStart(2, "0")}`;
-      const linkedParent = c.grade === "grade-11" && i === 0;
+      const linkedParent = c.name === "Grade 11 - ICT A" && i === 0;
       const s = await client.query(
         `INSERT INTO student (id, lrn, surname, firstname, middlename, sex, birth_date, parent_name, parent_contact, address)
          VALUES ($1, $2, $3, $4, '', $5, $6, $7, $8, $9)
@@ -199,13 +245,34 @@ try {
     const studentIds = studentsByClass[o.classId];
     const subjectTeacherId = o.teacherId ?? o.adviserId;
     for (const [i, studentId] of studentIds.entries()) {
-      const value = o.status === "draft" && i % 4 === 0 ? null : 78 + ((i * 3 + j * 5) % 20);
+      const base = 78 + ((i * 3 + j * 5) % 20);
+      const writtenWork = Math.min(100, Math.max(60, base - 3 + ((i + j) % 7)));
+      const performanceTask = Math.min(100, Math.max(60, base + 3 - ((i * 2 + j) % 9)));
+      const otherAssessment = Math.min(100, Math.max(60, base - 1 + ((i * 3 + j) % 5)));
+      const encoded = !(o.status === "draft" && i % 4 === 0);
+      // Same weights the seed stores on every offering (30 / 50 / 20).
+      const value = encoded
+        ? Math.round((writtenWork * 30 + performanceTask * 50 + otherAssessment * 20) / 100)
+        : null;
       await client.query(
-        `INSERT INTO grade (id, class_subject_id, student_id, value, updated_by, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO grade (id, class_subject_id, student_id, value, written_work,
+           performance_task, other_assessment, updated_by, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          ON CONFLICT (class_subject_id, student_id) DO UPDATE SET value = excluded.value,
-           updated_by = excluded.updated_by, updated_at = excluded.updated_at`,
-        [randomUUID(), o.id, studentId, value, subjectTeacherId, now]
+           written_work = excluded.written_work, performance_task = excluded.performance_task,
+           other_assessment = excluded.other_assessment, updated_by = excluded.updated_by,
+           updated_at = excluded.updated_at`,
+        [
+          randomUUID(),
+          o.id,
+          studentId,
+          value,
+          encoded ? writtenWork : null,
+          encoded ? performanceTask : null,
+          encoded ? otherAssessment : null,
+          subjectTeacherId,
+          now,
+        ]
       );
     }
 
@@ -256,7 +323,7 @@ try {
   }
 
   // Parent portal: link the demo parent to one Grade 11 student.
-  const linkedChild = studentsByClass[classIds["grade-11"]][0];
+  const linkedChild = studentsByClass[classIds["Grade 11 - ICT A"]][0];
   await client.query(
     `INSERT INTO parent_link (id, user_id, student_id, relationship)
      VALUES ($1, $2, $3, 'Parent')
@@ -265,7 +332,7 @@ try {
   );
 
   // Junior high school records that feed Form 137.
-  const jhsStudents = studentsByClass[classIds["grade-11"]].slice(0, 3);
+  const jhsStudents = studentsByClass[classIds["Grade 11 - ICT A"]].slice(0, 3);
   for (const [i, studentId] of jhsStudents.entries()) {
     const subjects = JSON.stringify([
       { subject: "Filipino", grade: String(88 + i) },
@@ -296,7 +363,7 @@ try {
   }
 
   // Record custody: one student waiting for the registrar, one already filed.
-  const g12Students = studentsByClass[classIds["grade-12"]];
+  const g12Students = studentsByClass[classIds["Grade 12 - HUMSS B"]];
   await client.query(
     `INSERT INTO record_surrender (id, student_id, class_id, reason, status, surrendered_by,
        surrendered_at, received_by, received_at, note)
@@ -304,7 +371,7 @@ try {
      ON CONFLICT (id) DO UPDATE SET student_id = excluded.student_id, class_id = excluded.class_id,
        reason = excluded.reason, status = excluded.status, surrendered_by = excluded.surrendered_by,
        received_by = excluded.received_by, received_at = excluded.received_at, note = excluded.note`,
-    ["demo-surrender-pending", g12Students[0], classIds["grade-12"], reyes, "Student transferred to another school."]
+    ["demo-surrender-pending", g12Students[0], classIds["Grade 12 - HUMSS B"], reyes, "Student transferred to another school."]
   );
   await client.query(
     `INSERT INTO record_surrender (id, student_id, class_id, reason, status, surrendered_by,
@@ -313,7 +380,7 @@ try {
      ON CONFLICT (id) DO UPDATE SET student_id = excluded.student_id, class_id = excluded.class_id,
        reason = excluded.reason, status = excluded.status, surrendered_by = excluded.surrendered_by,
        received_by = excluded.received_by, received_at = excluded.received_at, note = excluded.note`,
-    ["demo-surrender-received", g12Students[1], classIds["grade-12"], reyes, registrar, "Permanent record filed."]
+    ["demo-surrender-received", g12Students[1], classIds["Grade 12 - HUMSS B"], reyes, registrar, "Permanent record filed."]
   );
 
   // A short audit trail so the registrar's log has something to show.
@@ -332,6 +399,24 @@ try {
          action = excluded.action, entity = excluded.entity, entity_id = excluded.entity_id,
          detail = excluded.detail`,
       [`demo-audit-${i + 1}`, actorId, actorName, action, entity, entityId, detail, i * 12]
+    );
+  }
+
+  // In-app notifications so the demo bell has something to show.
+  const notificationRows = [
+    [adviser, "Grades submitted: OC11", "Demo Subject Teacher submitted Grade 11 - ICT A · OC11 · Term 1 for your verification.", "info", false],
+    [adviser, "Grades returned: GM11", "The registrar returned General Mathematics for correction: check the encoded scores.", "warning", false],
+    [subjectTeacher, "Grades approved: ELS11", "The registrar approved Grade 11 - ICT A · ELS11 · Term 1. The grades are locked.", "success", false],
+    [registrar, "Grades verified: SP12", "Demo Adviser Cruz verified Grade 12 - ICT B · Statistics and Probability · Term 2.", "info", false],
+    [registrar, "Record received", "The permanent record of a Grade 12 HUMSS B student is now on file.", "success", true],
+  ];
+  for (const [i, [userId, title, body, type, read]] of notificationRows.entries()) {
+    await client.query(
+      `INSERT INTO notification (id, user_id, title, body, type, read_at, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, now() - ($7 || ' hours')::interval)
+       ON CONFLICT (id) DO UPDATE SET user_id = excluded.user_id, title = excluded.title,
+         body = excluded.body, type = excluded.type, read_at = excluded.read_at`,
+      [`demo-notification-${i + 1}`, userId, title, body, type, read ? now : null, i * 6]
     );
   }
 

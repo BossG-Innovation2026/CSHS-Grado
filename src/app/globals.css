@@ -1,31 +1,33 @@
 @import "tailwindcss";
 
 /*
- * Project Grado — dark forest green design system.
- * One palette only: the previous emerald-on-cream theme was replaced.
+ * Project Grado — dark academic design system (Cabiao SHS).
+ *
+ * One palette only: deep blue-black surfaces with a cyan accent. The previous
+ * emerald-on-cream theme is gone, so there is no theme switcher.
  * Print views override these tokens back to paper colours (see bottom).
  */
 :root {
-  --bg: #0c0f0d;
-  --fg: #e5eae3;
-  --sidebar: #101512;
-  --surface: #1b211b;
-  --panel: #202620;
-  --panel-hover: #293329;
-  --selected: #2b382c;
-  --border: #323b32;
-  --input: #151b16;
-  --muted: #a0a99d;
-  --subtle: #858f83;
-  --accent: #a2bea1;
-  --accent-strong: #8fb491;
-  --accent-soft: #2b382c;
-  --on-accent: #0c0f0d;
-  --success: #8fbf91;
-  --warning: #d9b56c;
-  --danger: #d47d83;
-  --info: #8fb4ac;
-  --ring: rgb(162 190 161 / 0.35);
+  --bg: #0d171a;
+  --fg: #e7f0f2;
+  --sidebar: #101d21;
+  --surface: #162429;
+  --panel: #1b2c32;
+  --panel-hover: #22363d;
+  --selected: #1f3d46;
+  --border: #26383e;
+  --input: #101d21;
+  --muted: #91a8b0;
+  --subtle: #6f8a92;
+  --accent: #20b7d3;
+  --accent-strong: #13c9e8;
+  --accent-soft: #12313a;
+  --on-accent: #05171c;
+  --success: #3ddc97;
+  --warning: #f2c14e;
+  --danger: #f27c86;
+  --info: #5cc8e8;
+  --ring: rgb(32 183 211 / 0.35);
   color-scheme: dark;
 }
 
@@ -54,7 +56,10 @@
 }
 
 body {
-  background: var(--bg);
+  background:
+    radial-gradient(1100px 520px at 85% -10%, rgb(32 183 211 / 0.09), transparent 60%),
+    radial-gradient(900px 460px at -10% 110%, rgb(19 201 232 / 0.06), transparent 60%),
+    var(--bg);
   color: var(--fg);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -89,7 +94,8 @@ body {
       background-color 150ms ease,
       border-color 150ms ease,
       color 150ms ease,
-      opacity 150ms ease;
+      opacity 150ms ease,
+      transform 150ms ease;
   }
 
   ::placeholder {

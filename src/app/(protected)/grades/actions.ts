@@ -4,9 +4,15 @@ import { randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb, schema } from "@/db";
-import { isValidGrade } from "@/lib/grades";
+import {
+  computeFinalGrade,
+  isValidComponent,
+  isValidGrade,
+  type GradeComponents,
+} from "@/lib/grades";
 import { findSheet } from "@/server/grades";
 import { recordAudit } from "@/server/audit";
+import { notifyUsers, usersWithRoles } from "@/server/notifications";
 import { userWithModule } from "@/server/guards";
 
 const { grade, gradeSubmission, classSubject, signedSheet } = schema;
@@ -18,12 +24,17 @@ export interface GradeActionState {
 }
 
 function refresh(classSubjectId: string) {
+  revalidatePath("/", "layout");
   revalidatePath("/dashboard");
   revalidatePath("/grades");
   revalidatePath(`/grades/${classSubjectId}`);
   revalidatePath("/grades/verify");
   revalidatePath("/registrar");
   revalidatePath("/audit");
+}
+
+function sheetTitle(offering: { className: string; code: string; term: number }) {
+  return `${offering.className} · ${offering.code} · Term ${offering.term}`;
 }
 
 /** Load a sheet and confirm the caller is allowed to encode it right now. */
@@ -41,6 +52,8 @@ async function forEncoding(classSubjectId: string) {
 /**
  * Save entered grades, optionally submitting the sheet. One grade per student
  * per subject offering (a class_subject is already one subject and one term).
+ * Written Work / Performance Task / Other components are optional; when all
+ * three are present the final grade is computed from the offering's weights.
  */
 export async function saveGrades(_prev: GradeActionState, formData: FormData): Promise<GradeActionState> {
   const classSubjectId = String(formData.get("classSubjectId") ?? "");
@@ -49,36 +62,79 @@ export async function saveGrades(_prev: GradeActionState, formData: FormData): P
   if ("error" in auth) return { error: auth.error };
   const { actor, sheet } = auth;
 
-  const values = new Map<string, number | null>();
-  for (const student of sheet.students) {
-    const raw = formData.get(`grade_${student.id}`);
-    if (raw === null) continue;
+  const weights = {
+    writtenWork: sheet.offering.wwWeight,
+    performanceTask: sheet.offering.ptWeight,
+    otherAssessment: sheet.offering.otherWeight,
+  };
+
+  interface Entry {
+    value: number | null;
+    components: GradeComponents;
+  }
+  const values = new Map<string, Entry>();
+
+  function parseComponent(raw: FormDataEntryValue | null): number | null | "invalid" {
+    if (raw === null) return null;
     const text = String(raw).trim();
-    if (!text) {
-      values.set(student.id, null);
-      continue;
-    }
+    if (!text) return null;
     const value = Number(text);
-    if (!Number.isFinite(value) || !isValidGrade(value)) {
-      return { error: `Grade for ${student.surname}, ${student.firstname} must be a whole number from 60 to 100.` };
+    return Number.isFinite(value) && isValidComponent(value) ? value : "invalid";
+  }
+
+  for (const student of sheet.students) {
+    const name = `${student.surname}, ${student.firstname}`;
+    const writtenWork = parseComponent(formData.get(`ww_${student.id}`));
+    const performanceTask = parseComponent(formData.get(`pt_${student.id}`));
+    const otherAssessment = parseComponent(formData.get(`other_${student.id}`));
+    if (writtenWork === "invalid") {
+      return { error: `Written Works for ${name} must be a whole number from 0 to 100.` };
     }
-    values.set(student.id, value);
+    if (performanceTask === "invalid") {
+      return { error: `Performance Tasks for ${name} must be a whole number from 0 to 100.` };
+    }
+    if (otherAssessment === "invalid") {
+      return { error: `Other Components for ${name} must be a whole number from 0 to 100.` };
+    }
+
+    const components: GradeComponents = { writtenWork, performanceTask, otherAssessment };
+    const computed = computeFinalGrade(components, weights);
+
+    let value = computed;
+    const raw = formData.get(`grade_${student.id}`);
+    if (value === null && raw !== null) {
+      const text = String(raw).trim();
+      if (text) {
+        const parsed = Number(text);
+        if (!Number.isFinite(parsed) || !isValidGrade(parsed)) {
+          return { error: `Grade for ${name} must be a whole number from 60 to 100.` };
+        }
+        value = parsed;
+      }
+    }
+
+    values.set(student.id, { value, components });
   }
 
   if (intent === "submit") {
-    const missing = sheet.students.filter((s) => values.get(s.id) === null || values.get(s.id) === undefined);
+    const missing = sheet.students.filter((s) => values.get(s.id)?.value === null || values.get(s.id)?.value === undefined);
     if (missing.length > 0) {
-      return { error: `Encode all students before submitting. ${missing.length} student(s) still have no grade.` };
+      return {
+        error: `Encode all students before submitting. ${missing.length} student(s) still have no final grade.`,
+      };
     }
   }
 
   const now = new Date();
   await getDb().transaction(async (tx) => {
-    const rows = [...values.entries()].map(([studentId, value]) => ({
+    const rows = [...values.entries()].map(([studentId, entry]) => ({
       id: randomUUID(),
       classSubjectId,
       studentId,
-      value,
+      value: entry.value,
+      writtenWork: entry.components.writtenWork,
+      performanceTask: entry.components.performanceTask,
+      otherAssessment: entry.components.otherAssessment,
       updatedBy: actor.id,
       updatedAt: now,
     }));
@@ -90,6 +146,9 @@ export async function saveGrades(_prev: GradeActionState, formData: FormData): P
           target: [grade.classSubjectId, grade.studentId],
           set: {
             value: sql`excluded.value`,
+            writtenWork: sql`excluded.written_work`,
+            performanceTask: sql`excluded.performance_task`,
+            otherAssessment: sql`excluded.other_assessment`,
             updatedBy: sql`excluded.updated_by`,
             updatedAt: sql`excluded.updated_at`,
           },
@@ -143,8 +202,15 @@ export async function saveGrades(_prev: GradeActionState, formData: FormData): P
     intent === "submit" ? "grades.submit" : "grades.save",
     "class_subject",
     classSubjectId,
-    `${sheet.offering.className} · ${sheet.offering.code} · Term ${sheet.offering.term}`
+    sheetTitle(sheet.offering)
   );
+  if (intent === "submit" && sheet.offering.adviserId !== actor.id) {
+    await notifyUsers([sheet.offering.adviserId], {
+      title: `Grades submitted: ${sheet.offering.code}`,
+      body: `${actor.name} submitted ${sheetTitle(sheet.offering)} for verification.`,
+      type: "info",
+    });
+  }
   refresh(classSubjectId);
   return {
     ok: true,
@@ -173,7 +239,13 @@ export async function verifyGrades(_prev: GradeActionState, formData: FormData):
     })
     .where(eq(gradeSubmission.classSubjectId, classSubjectId));
 
-  await recordAudit(actor, "grades.verify", "class_subject", classSubjectId, `${sheet.offering.className} · ${sheet.offering.code}`);
+  await recordAudit(actor, "grades.verify", "class_subject", classSubjectId, sheetTitle(sheet.offering));
+  const registrars = (await usersWithRoles(["registrar", "system_admin"])).filter((id) => id !== actor.id);
+  await notifyUsers([sheet.offering.teacherId, ...registrars], {
+    title: `Grades verified: ${sheet.offering.code}`,
+    body: `${actor.name} verified ${sheetTitle(sheet.offering)}. It is ready for registrar approval.`,
+    type: "info",
+  });
   refresh(classSubjectId);
   return { ok: true, message: "Grades verified. The registrar can now approve them." };
 }
@@ -201,7 +273,15 @@ export async function approveGrades(_prev: GradeActionState, formData: FormData)
     })
     .where(eq(gradeSubmission.classSubjectId, classSubjectId));
 
-  await recordAudit(actor, "grades.approve", "class_subject", classSubjectId, `${sheet.offering.className} · ${sheet.offering.code}`);
+  await recordAudit(actor, "grades.approve", "class_subject", classSubjectId, sheetTitle(sheet.offering));
+  await notifyUsers(
+    [sheet.offering.teacherId, sheet.offering.adviserId].filter((id) => id !== actor.id),
+    {
+      title: `Grades approved: ${sheet.offering.code}`,
+      body: `The registrar approved ${sheetTitle(sheet.offering)}. The grades are locked.`,
+      type: "success",
+    }
+  );
   refresh(classSubjectId);
   return { ok: true, message: "Grades approved and locked." };
 }
@@ -235,6 +315,14 @@ export async function returnGrades(_prev: GradeActionState, formData: FormData):
     .where(eq(gradeSubmission.classSubjectId, classSubjectId));
 
   await recordAudit(actor, "grades.return", "class_subject", classSubjectId, note);
+  await notifyUsers(
+    [sheet.offering.teacherId, sheet.offering.adviserId].filter((id) => id !== actor.id),
+    {
+      title: `Grades returned: ${sheet.offering.code}`,
+      body: `${sheetTitle(sheet.offering)} was returned for correction: ${note.slice(0, 280)}`,
+      type: "warning",
+    }
+  );
   refresh(classSubjectId);
   return { ok: true, message: "Sheet returned to the teacher." };
 }

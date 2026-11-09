@@ -22,21 +22,31 @@ export interface TeacherAdvisory {
   id: string;
   name: string;
   gradeLevelName: string;
+  strand: string;
+  schoolYear: string;
 }
 
 export interface TeacherAssessment {
   studentId: string;
   term: number;
   className: string;
+  strand: string;
+  schoolYear: string;
   gradeLevelName: string;
   subjectCode: string;
   subjectTitle: string;
   value: number | null;
+  writtenWork: number | null;
+  performanceTask: number | null;
+  otherAssessment: number | null;
   status: SubmissionStatus;
 }
 
 export interface TeacherGradeStudent extends TeacherDashboardStudent {
   gradeValue: number | null;
+  writtenWork: number | null;
+  performanceTask: number | null;
+  otherAssessment: number | null;
 }
 
 export interface TeacherDashboardData {
@@ -61,6 +71,8 @@ export async function getTeacherDashboard(): Promise<TeacherDashboardData> {
       id: schoolClass.id,
       name: schoolClass.name,
       gradeLevelName: gradeLevel.name,
+      strand: schoolClass.strand,
+      schoolYear: schoolClass.schoolYear,
     })
     .from(schoolClass)
     .innerJoin(gradeLevel, eq(gradeLevel.id, schoolClass.gradeLevelId))
@@ -93,10 +105,15 @@ export async function getTeacherDashboard(): Promise<TeacherDashboardData> {
             studentId: grade.studentId,
             term: classSubject.term,
             className: schoolClass.name,
+            strand: schoolClass.strand,
+            schoolYear: schoolClass.schoolYear,
             gradeLevelName: gradeLevel.name,
             subjectCode: classSubject.code,
             subjectTitle: classSubject.title,
             value: grade.value,
+            writtenWork: grade.writtenWork,
+            performanceTask: grade.performanceTask,
+            otherAssessment: grade.otherAssessment,
             status: sql<SubmissionStatus>`coalesce(${gradeSubmission.status}, 'draft')`,
           })
           .from(grade)
@@ -127,6 +144,9 @@ export async function getTeacherDashboard(): Promise<TeacherDashboardData> {
             sex: student.sex,
             birthDate: student.birthDate,
             gradeValue: grade.value,
+            writtenWork: grade.writtenWork,
+            performanceTask: grade.performanceTask,
+            otherAssessment: grade.otherAssessment,
           })
           .from(classSubject)
           .innerJoin(enrollment, eq(enrollment.classId, classSubject.classId))

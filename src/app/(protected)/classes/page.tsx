@@ -31,6 +31,8 @@ export default async function ClassesPage() {
             <tr>
               <th className="px-4 py-3">Section</th>
               <th className="px-4 py-3">Grade level</th>
+              <th className="px-4 py-3">Strand</th>
+              <th className="px-4 py-3">School year</th>
               <th className="px-4 py-3">Adviser</th>
               <th className="px-4 py-3"></th>
             </tr>
@@ -40,6 +42,8 @@ export default async function ClassesPage() {
               <tr key={c.id}>
                 <td className="px-4 py-3 font-medium text-foreground">{c.name}</td>
                 <td className="px-4 py-3 text-foreground">{c.gradeLevelName}</td>
+                <td className="px-4 py-3 text-xs text-muted">{c.strand || "—"}</td>
+                <td className="px-4 py-3 text-xs text-muted">{c.schoolYear || "—"}</td>
                 <td className="px-4 py-3 text-xs text-muted">{c.adviserName}</td>
                 <td className="px-4 py-3 text-right">
                   <Link href={`/classes/${c.id}`} className="text-accent-strong hover:underline">
@@ -50,7 +54,7 @@ export default async function ClassesPage() {
             ))}
             {classes.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-subtle">
+                <td colSpan={6} className="px-4 py-8 text-center text-subtle">
                   No classes yet. Create the first one.
                 </td>
               </tr>

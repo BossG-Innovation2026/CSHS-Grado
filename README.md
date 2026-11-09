@@ -11,6 +11,15 @@ parent portal that only shows linked children's approved cards.
 Why this stack, the free-tier budget, the scale-up path and the go-live checklist are in
 [docs/architecture.md](docs/architecture.md).
 
+## Live sites
+
+| Site | URL | Notes |
+|------|-----|-------|
+| Production | <https://shs-grades.innov-proj2026.workers.dev> | Real school data — accounts only, no public demo logins |
+| Demo | <https://grado-demo.innov-proj2026.workers.dev> | Fake data, one-click sign-in for every role (see [Demo site](#demo-site)) |
+
+Source code: <https://github.com/BossG-Innovation2026/CSHS-Grado> (public).
+
 ## Local development
 
 Prerequisites: Node.js 22.12+ (no Docker needed).

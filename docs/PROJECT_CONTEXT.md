@@ -85,21 +85,23 @@ Auth (better-auth, keep JS keys): `user` (+ `role`, `permissions` JSON text, `ac
 School: `school_settings` (single row id `school`), `notification`,
 `grade_level` (seeded K–12 ids `grade-k`…`grade-12`; production currently keeps only the 2
 levels the school uses), `subject` (per grade level; `code` unique per level; `terms`,
-`credit_units`), `class` (section: `name`, `grade_level_id`, `adviser_id`),
-`class_subject` (subject offered in a class **per term** 1–3, snapshot `code`/`title`,
-optional `teacher_id` = subject teacher), `student` (LRN unique, not an auth account;
-personal fields `birth_date`, `parent_name`, `parent_contact`, `address`),
-`enrollment` (class ↔ student).
+`credit_units`), `class` (section: `name`, `strand` ICT/HUMSS/STEM, `school_year`,
+`grade_level_id`, `adviser_id`), `class_subject` (subject offered in a class **per term**
+1–3, snapshot `code`/`title`, optional `teacher_id` = subject teacher, and per-offering
+assessment weights `ww_weight`/`pt_weight`/`other_weight` that must total 100), `student`
+(LRN unique, not an auth account; personal fields `birth_date`, `parent_name`,
+`parent_contact`, `address`), `enrollment` (class ↔ student).
 
-Grades and records: `grade` (one value per `class_subject` × student, DepEd 60–100),
+Grades and records: `grade` (one final value per `class_subject` × student, DepEd 60–100,
+plus optional `written_work`, `performance_task`, `other_assessment` percentages),
 `grade_submission` (workflow status per `class_subject`: `draft`/`submitted`/`verified`/
 `approved`/`returned`, with who/when and the return note), `signed_sheet` (paper grading
 sheet received by the registrar), `academic_record` (previous-school/JHS history with
 JSON `subjects`), `record_surrender` (adviser → registrar custody of a permanent record),
-`parent_link` (parent account ↔ student), `audit_log` (append-only who-changed-what).
+`parent_link` (parent account ↔ student), `audit_log` (append-only who-changed-what),
+`notification` (per-account in-app messages).
 
-Still not modelled: school year on classes, department-head assignment per class, DepEd
-Written Work / Performance Tasks / Quarterly Assessment components (see §9).
+Still not modelled: department-head assignment per class (verification is role-based).
 
 ## 6. Code layout and conventions
 
@@ -167,18 +169,26 @@ Workflow per `class_subject` (one subject, one term):
 5. **Registrar** prints report cards and the Form 137 permanent record. Only approved
    grades appear on printed/parent cards.
 
-Teacher dashboard (2026-11-07): teacher accounts with `grades_submit` open a
-purpose-built dashboard instead of the generic quick-action page. It shows **My Advisory**
-(advisory section, searchable student list, selected student's snapshot and academic-card
-link), an **Assessment Information | Grades** table for that student, **My Class** cards for
-the subject sections the teacher may encode, and a **Grades** panel that follows the selected
-subject/term and encodes through the existing `saveGrades` action. Data comes from
-`src/server/teacher-dashboard.ts` (same adviser/subject-teacher access rules as
-`listMyOfferings`); `teacher-dashboard.tsx` handles selection and grading in the browser.
-The save action re-authorises and now revalidates `/dashboard`. The UI is a single dark
-forest-green palette (`src/app/globals.css` tokens, 2026-11-08); print views switch the
-same tokens back to paper colours. The old light/dark/system toggle was removed with the
-redesign, so there is no theme switcher.
+Teacher dashboard (rebuilt 2026-11-09): teacher accounts with `grades_submit` open a
+purpose-built dashboard instead of the generic quick-action page. It has four connected
+sections: **My Advisory** (section, grade level, strand, school year, student count,
+searchable list, selected-student snapshot with profile/academic-card links), **Assessment
+Information and Grades** (Written Works, Performance Tasks, Other Components, final grade
+and remark with Term 1/2/3 filters), **My Class** (subject-section cards with grade level,
+strand, school year, enrolled count, encoding progress, workflow status and a link to the
+class record) and **Grades Overview** (section/subject/term filters, inline encoding with
+the shared `GradeEntryTable`, validation, save/submit confirmation, CSV export and print).
+A notification bell in the top navigation shows grade-workflow messages and supports
+mark-one/mark-all-read. Data comes from `src/server/teacher-dashboard.ts` (same
+adviser/subject-teacher access rules as `listMyOfferings`); the client components handle
+selection, filtering, CSV export and the print view. The save action re-authorises,
+recomputes the final grade from the component weights, revalidates `/dashboard`, writes an
+audit entry and notifies the next person in the workflow.
+
+The UI uses one dark academic palette — background `#0D171A`, sidebar `#101D21`, cards
+`#162429`, elevated surfaces `#1B2C32`, accent `#20B7D3`/`#13C9E8`, text `#E7F0F2`/
+`#91A8B0`, borders `#26383E` — defined once in `src/app/globals.css` tokens. Print views
+switch the same tokens back to paper colours. There is no theme switcher.
 
 Pages and routes:
 
@@ -201,7 +211,10 @@ Pages and routes:
 
 Decisions taken (owner's answers):
 - Grading scale: **DepEd 60–100, 75 passing**. One final grade per student per subject
-  per term (no Written Work / Performance Tasks / Quarterly Assessment split yet).
+  per term. Each subject offering stores Written Works / Performance Tasks / Other
+  assessment weights (default 30/50/20, must total 100); when all three component scores
+  are encoded the final grade is their weighted average, otherwise a final grade can be
+  encoded directly.
 - Parent access: **parent accounts + `parent_link`**, created/linked by the registrar;
   no voucher codes. A parent can only open children linked to their account, and only
   approved grades are queried.
@@ -209,12 +222,16 @@ Decisions taken (owner's answers):
   registrar confirms receipt. Reasons: graduated, transferred, stopped attending.
 - Personal information: teachers see DOB; parent/contact/address stay with the registrar
   office (and System Admin), per the owner's instruction.
-- School year on classes and department-head-per-class are still not modelled; the
-  existing role-based verification (school head/department head sees all) is used.
+- School year on classes is now modelled (`class.school_year`; sections also carry
+  `class.strand`). Department-head-per-class is still not modelled; the existing
+  role-based verification (school head/department head sees all) is used.
 
-Demo seed (`scripts/seed-demo.mjs`) creates grades in every state, signed sheets, JHS
-records, one pending and one received surrender, an audit trail, and a parent account
-linked to one fake student (password `DemoPass2026!`).
+Demo seed (`scripts/seed-demo.mjs`) creates four sections (Grade 11/12 ICT A, HUMSS A,
+ICT B, HUMSS B), all subjects in all three terms, component + final grades in every
+workflow state, signed sheets, JHS records, one pending and one received surrender, an
+audit trail, notifications, and a parent account linked to one fake student
+(password `DemoPass2026!`). `deploy.yml` re-runs it with `--reset` after deploying the
+demo Worker so the demo always matches the current schema; demo data is fake by design.
 
 ## 10. Security rules (do not break)
 

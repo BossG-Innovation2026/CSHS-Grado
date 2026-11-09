@@ -5,6 +5,7 @@ import { and, asc, count, eq, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb, schema } from "@/db";
+import { DEFAULT_WEIGHTS } from "@/lib/grades";
 import { TERMS, type Term } from "@/lib/terms";
 import type { SessionUser } from "@/lib/session";
 import { checkOwnPassword, userWithModule } from "@/server/guards";
@@ -49,6 +50,26 @@ function nextSectionName(gradeLevelName: string, existing: number): string {
   return `${gradeLevelName} - ${String.fromCharCode(65 + existing)}`; // A, B, C...
 }
 
+function shortText(formData: FormData, key: string, max: number): string {
+  return String(formData.get(key) ?? "").trim().slice(0, max);
+}
+
+/** Read the three component weights; they must be whole percentages totalling 100. */
+function readWeights(formData: FormData):
+  | { wwWeight: number; ptWeight: number; otherWeight: number }
+  | { error: string } {
+  const raw = ["wwWeight", "ptWeight", "otherWeight"].map((key) => String(formData.get(key) ?? "").trim());
+  const fallback = [DEFAULT_WEIGHTS.writtenWork, DEFAULT_WEIGHTS.performanceTask, DEFAULT_WEIGHTS.otherAssessment];
+  const values = raw.map((text, index) => (text === "" ? fallback[index] : Number(text)));
+  if (values.some((value) => !Number.isInteger(value) || value < 0 || value > 100)) {
+    return { error: "Assessment weights must be whole numbers from 0 to 100." };
+  }
+  if (values[0] + values[1] + values[2] !== 100) {
+    return { error: "Written Works, Performance Tasks and Other weights must add up to 100." };
+  }
+  return { wwWeight: values[0], ptWeight: values[1], otherWeight: values[2] };
+}
+
 export async function createClass(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const user = await userWithModule("classes");
   if (!user) return NO_ACCESS;
@@ -91,7 +112,14 @@ export async function createClass(_prev: ActionState, formData: FormData): Promi
   const classId = randomUUID();
   const inserted = await db
     .insert(schoolClass)
-    .values({ id: classId, name, gradeLevelId, adviserId: user.id })
+    .values({
+      id: classId,
+      name,
+      strand: shortText(formData, "strand", 40),
+      schoolYear: shortText(formData, "schoolYear", 20),
+      gradeLevelId,
+      adviserId: user.id,
+    })
     .onConflictDoNothing({ target: [schoolClass.gradeLevelId, schoolClass.name] })
     .returning({ id: schoolClass.id });
   if (inserted.length === 0) return { error: `${level.name} - ${name} already exists.` };
@@ -124,6 +152,9 @@ export async function addClassSubject(_prev: ActionState, formData: FormData): P
   const term = Number(formData.get("term") ?? 1);
   if (!TERMS.includes(term as Term)) return { error: "Invalid term." };
 
+  const weights = readWeights(formData);
+  if ("error" in weights) return weights;
+
   const db = getDb();
   const subjectId = String(formData.get("subjectId") ?? "");
   const [picked] = await db
@@ -144,6 +175,7 @@ export async function addClassSubject(_prev: ActionState, formData: FormData): P
       description: String(formData.get("description") ?? "").trim(),
       teacherId: String(formData.get("teacherId") ?? "") || null,
       term,
+      ...weights,
     })
     .onConflictDoNothing({ target: [classSubject.classId, classSubject.code, classSubject.term] })
     .returning({ id: classSubject.id });
@@ -193,7 +225,14 @@ export async function renameClass(_prev: ActionState, formData: FormData): Promi
     .limit(1);
   if (clash) return { error: `A class named ${name} already exists in ${cls.gradeLevelName}.` };
 
-  await db.update(schoolClass).set({ name }).where(eq(schoolClass.id, classId));
+  await db
+    .update(schoolClass)
+    .set({
+      name,
+      strand: shortText(formData, "strand", 40),
+      schoolYear: shortText(formData, "schoolYear", 20),
+    })
+    .where(eq(schoolClass.id, classId));
   revalidatePath("/classes");
   revalidatePath(`/classes/${classId}`);
   return { ok: true };

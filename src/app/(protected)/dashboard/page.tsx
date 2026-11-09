@@ -101,6 +101,8 @@ export default async function DashboardPage() {
         data={teacherData}
         teacherName={user.name}
         canOpenStudentCard={can(user, "personal_info")}
+        canOpenAcademicCard={can(user, "academic_info")}
+        canOpenClass={can(user, "classes")}
       />
     );
   }

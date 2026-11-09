@@ -62,7 +62,7 @@ export default async function GradeSheetPage({ params }: { params: Promise<{ id:
           title="Grades"
           description={`${offering.encodedCount} of ${offering.studentCount} student(s) encoded. A grade of 75 or higher is passing.`}
         >
-          <GradeSheetForm classSubjectId={offering.id} students={sheet.students} canEncode={sheet.canEncode} />
+          <GradeSheetForm offering={offering} students={sheet.students} canEncode={sheet.canEncode} />
         </Panel>
       </div>
 

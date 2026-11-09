@@ -51,7 +51,7 @@ export function VerificationActions({
               <button
                 type="submit"
                 disabled={approving}
-                className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                className="rounded-md bg-success px-4 py-2 text-sm font-semibold text-on-accent hover:opacity-90 disabled:opacity-50"
               >
                 {approving ? "Approving…" : "Approve and lock"}
               </button>

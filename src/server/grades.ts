@@ -26,6 +26,8 @@ export interface SubjectOffering {
   id: string;
   classId: string;
   className: string;
+  strand: string;
+  schoolYear: string;
   gradeLevelName: string;
   code: string;
   title: string;
@@ -39,12 +41,17 @@ export interface SubjectOffering {
   studentCount: number;
   encodedCount: number;
   sheetReceivedAt: Date | null;
+  wwWeight: number;
+  ptWeight: number;
+  otherWeight: number;
 }
 
 interface OfferingBase {
   id: string;
   classId: string;
   className: string;
+  strand: string;
+  schoolYear: string;
   gradeLevelName: string;
   code: string;
   title: string;
@@ -55,12 +62,17 @@ interface OfferingBase {
   adviserName: string;
   status: SubmissionStatus;
   returnNote: string;
+  wwWeight: number;
+  ptWeight: number;
+  otherWeight: number;
 }
 
 const offeringColumns = {
   id: classSubject.id,
   classId: classSubject.classId,
   className: schoolClass.name,
+  strand: schoolClass.strand,
+  schoolYear: schoolClass.schoolYear,
   gradeLevelName: gradeLevel.name,
   code: classSubject.code,
   title: classSubject.title,
@@ -71,6 +83,9 @@ const offeringColumns = {
   adviserName: sql<string>`coalesce(${adviser.name}, '')`,
   status: sql<SubmissionStatus>`coalesce(${gradeSubmission.status}, 'draft')`,
   returnNote: sql<string>`coalesce(${gradeSubmission.returnNote}, '')`,
+  wwWeight: classSubject.wwWeight,
+  ptWeight: classSubject.ptWeight,
+  otherWeight: classSubject.otherWeight,
 };
 
 function baseOfferingQuery() {
@@ -147,6 +162,9 @@ export async function listVerificationQueue(): Promise<SubjectOffering[]> {
 
 export interface SheetStudent extends StudentRow {
   gradeValue: number | null;
+  writtenWork: number | null;
+  performanceTask: number | null;
+  otherAssessment: number | null;
 }
 
 export interface SubjectSheet {
@@ -172,7 +190,13 @@ export async function findSheet(actor: SessionUser, classSubjectId: string): Pro
 
   const [decorated] = await decorate([row]);
   const students = await getDb()
-    .select({ ...studentColumns, gradeValue: grade.value })
+    .select({
+      ...studentColumns,
+      gradeValue: grade.value,
+      writtenWork: grade.writtenWork,
+      performanceTask: grade.performanceTask,
+      otherAssessment: grade.otherAssessment,
+    })
     .from(enrollment)
     .innerJoin(student, eq(student.id, enrollment.studentId))
     .leftJoin(grade, and(eq(grade.studentId, student.id), eq(grade.classSubjectId, classSubjectId)))

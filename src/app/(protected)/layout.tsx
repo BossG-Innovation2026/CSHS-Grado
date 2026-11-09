@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/session";
 import { NAV_LINKS, getPermissions, ROLE_LABELS } from "@/lib/access";
 import { TopNav } from "@/components/top-nav";
 import { isDemoMode } from "@/lib/demo";
+import { countUnreadNotifications, listNotifications } from "@/server/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,10 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   if (!user) redirect("/login");
 
   const permissions = getPermissions(user);
+  const [notifications, unreadNotifications] = await Promise.all([
+    listNotifications(user.id),
+    countUnreadNotifications(user.id),
+  ]);
   const links = NAV_LINKS.filter((l) => permissions.includes(l.module)).map((l) => ({
     href: l.href,
     label: l.label,
@@ -29,6 +34,8 @@ export default async function ProtectedLayout({ children }: { children: React.Re
         links={links}
         isDemo={isDemoMode()}
         canSearch={permissions.includes("personal_info") || permissions.includes("registrar")}
+        notifications={notifications}
+        unreadNotifications={unreadNotifications}
       />
       <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 sm:px-6 print:max-w-none print:p-0">{children}</main>
     </div>

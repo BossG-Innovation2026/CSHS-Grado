@@ -2,6 +2,14 @@
   "name": "grado",
   "version": "0.1.0",
   "private": true,
+  "homepage": "https://shs-grades.innov-proj2026.workers.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BossG-Innovation2026/CSHS-Grado.git"
+  },
+  "bugs": {
+    "url": "https://github.com/BossG-Innovation2026/CSHS-Grado/issues"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
