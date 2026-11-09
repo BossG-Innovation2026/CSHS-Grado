@@ -19,7 +19,7 @@ async function signIn(page, email, password = PASSWORD) {
     await page.goto(`${BASE}/login`);
     await page.locator("#email").fill(email);
     await page.locator("#password").fill(password);
-    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
     try {
       await page.waitForURL("**/dashboard", { timeout: 30000 });
       return;
@@ -80,6 +80,7 @@ async function check(name, cond, extra = "") {
   // prove modules stay configurable per account.
   await page.locator('input[name="modules"][value="classes"]').uncheck();
   await page.locator('input[name="modules"][value="codes"]').uncheck();
+  await page.locator('input[name="modules"][value="grades_approve"]').uncheck();
   await page.locator('input[name="modules"][value="curriculum"]').check();
   await page.locator('input[name="modules"][value="grades_submit"]').check();
   await page.getByRole("button", { name: "Create account" }).click();
@@ -95,22 +96,25 @@ const nav = await page.locator("nav").innerText();
   await check(
     "teacher panel shows only accessed modules",
     nav.includes("Dashboard") &&
-      nav.includes("Curriculum Setup") &&
-      nav.includes("Grade Submission") &&
-      !nav.includes("Account Management") &&
+      nav.includes("Curriculum") &&
+      nav.includes("Submit grades") &&
+      nav.includes("Personal info") &&
+      !nav.includes("Accounts") &&
       !nav.includes("Classes") &&
-      !nav.includes("Grades Approval") &&
-      !nav.includes("Records & Forms") &&
-      !nav.includes("Access Codes"),
+      !nav.includes("Verify grades") &&
+      !nav.includes("Registrar") &&
+      !nav.includes("Codes"),
     nav.replace(/\n/g, " | ")
   );
   await page.goto(`${BASE}/accounts`);
   await check("teacher blocked from /accounts", page.url().includes("/dashboard"));
   const dashText = await page.locator("body").innerText();
-  await check("dashboard shows analytics placeholder", dashText.includes("Analytics and notifications"));
+  await check(
+    "teacher dashboard shows advisory workspace",
+    dashText.includes("Teacher Dashboard") && dashText.includes("My Advisory")
+  );
 
   // --- 3. Teacher's own account page is read-only
-  const teacherId = (await page.request.get(`${BASE}/api/auth/get-session`, {}));
   await signOut(page);
 
   // --- 4. System Admin self-edit: every module locked on
@@ -145,7 +149,7 @@ const nav = await page.locator("nav").innerText();
   await page.goto(`${BASE}/login`);
   await page.locator("#email").fill(TEACHER_EMAIL);
   await page.locator("#password").fill("NewPassw0rd123!");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   try {
     await page.waitForURL("**/dashboard", { timeout: 30000 });
   } catch (e) {
@@ -168,7 +172,7 @@ const nav = await page.locator("nav").innerText();
   await page.goto(`${BASE}/login`);
   await page.locator("#email").fill(TEACHER_EMAIL);
   await page.locator("#password").fill("NewPassw0rd123!");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   try {
     await page.waitForURL("**/login", { timeout: 30000 });
   } catch (e) {
@@ -182,7 +186,13 @@ const nav = await page.locator("nav").innerText();
 // --- 8. System Admin sees everything and can create every staff role
   await signIn(page, SUPER_EMAIL);
   const superNav = await page.locator("nav").innerText();
-  await check("System Admin nav shows all modules", superNav.includes("Account Management"));
+  await check(
+    "System Admin nav shows all modules",
+    superNav.includes("Accounts") &&
+      superNav.includes("Curriculum") &&
+      superNav.includes("Registrar") &&
+      superNav.includes("Audit log")
+  );
   await page.goto(`${BASE}/accounts/new`);
   const roleOptions = await page.locator("#role option").allInnerTexts();
   await check(

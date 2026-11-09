@@ -2,7 +2,9 @@
 
 Grades and records system for senior high schools: accounts with per-module access,
 curriculum (grade levels, subjects, credit units), classes with per-term subjects and
-subject teachers, and student enrollment with Excel bulk upload.
+subject teachers, student enrollment with Excel bulk upload, the adviser → registrar
+grade workflow, permanent records (Form 137), report-card printing, an audit log, and a
+parent portal that only shows linked children's approved cards.
 
 **Stack:** Next.js 16 · React 19 · Tailwind 4 · better-auth · Drizzle ORM · PostgreSQL
 (Neon) via Cloudflare Hyperdrive · Cloudflare Workers (OpenNext).
@@ -53,11 +55,11 @@ on port 3000 (override with `E2E_BASE` / `APP_BASE_URL`).
 | Role | Does | Default modules (editable per account) |
 |------|------|-----------------------------------------|
 | System Admin | Configures grade levels, subjects, classes and accounts | All, always |
-| School Head | School-wide overview, analytics, grade approval | Classes, Curriculum, Grades Approval |
-| Department Head | Classes assigned to them, grade approval | Classes, Grades Approval |
-| Registrar | Student records and forms (SF9/SF10) | Classes, Records & Forms |
-| Teacher | Adviser of classes they create (can also teach subjects); submits grades | Classes, Grade Submission, Access Codes |
-| Student / Parent | Views grades with a voucher code from the adviser (coming with grades) | — |
+| School Head | School-wide overview, analytics, grade verification | Classes, Curriculum, Verify grades, Personal info, Academic info |
+| Department Head | Classes assigned to them, grade verification | Classes, Verify grades, Personal info |
+| Registrar | Final grade approval, records, Form 137, card printing, parent links, audit | Classes, Registrar, Personal info, Academic info, Audit log, Verify grades |
+| Teacher | Adviser of classes they create (can also teach subjects); encodes, submits and verifies their own class's grades | Classes, Submit grades, Verify grades, Personal info |
+| Parent / Guardian | Views the approved report card(s) of children linked by the registrar | My child's card |
 
 ## Demo site
 

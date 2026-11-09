@@ -1,66 +1,54 @@
 @import "tailwindcss";
 
-:root,
-:root[data-theme="light"] {
-  --bg: #eef1f3;
-  --fg: #123a46;
-  --surface: #f8fafb;
-  --panel: #dde4e8;
-  --panel-hover: #cfdade;
-  --border: #c9d2d6;
-  --muted: #5b6f77;
-  --subtle: #7d9099;
-  --accent: #0aa5c3;
-  --accent-strong: #078aa8;
-  --accent-soft: #d9f1f6;
-  --on-accent: #ffffff;
-}
-
-:root[data-theme="dark"] {
-  --bg: #0d1518;
-  --fg: #e8f1f4;
-  --surface: #152126;
-  --panel: #101b1f;
-  --panel-hover: #1b2a30;
-  --border: #24353b;
-  --muted: #94a8b0;
-  --subtle: #6e828a;
-  --accent: #1fb8d8;
-  --accent-strong: #39c9e6;
-  --accent-soft: #16303a;
-  --on-accent: #052a33;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0d1518;
-    --fg: #e8f1f4;
-    --surface: #152126;
-    --panel: #101b1f;
-    --panel-hover: #1b2a30;
-    --border: #24353b;
-    --muted: #94a8b0;
-    --subtle: #6e828a;
-    --accent: #1fb8d8;
-    --accent-strong: #39c9e6;
-    --accent-soft: #16303a;
-    --on-accent: #052a33;
-  }
+/*
+ * Project Grado — dark forest green design system.
+ * One palette only: the previous emerald-on-cream theme was replaced.
+ * Print views override these tokens back to paper colours (see bottom).
+ */
+:root {
+  --bg: #0c0f0d;
+  --fg: #e5eae3;
+  --sidebar: #101512;
+  --surface: #1b211b;
+  --panel: #202620;
+  --panel-hover: #293329;
+  --selected: #2b382c;
+  --border: #323b32;
+  --input: #151b16;
+  --muted: #a0a99d;
+  --subtle: #858f83;
+  --accent: #a2bea1;
+  --accent-strong: #8fb491;
+  --accent-soft: #2b382c;
+  --on-accent: #0c0f0d;
+  --success: #8fbf91;
+  --warning: #d9b56c;
+  --danger: #d47d83;
+  --info: #8fb4ac;
+  --ring: rgb(162 190 161 / 0.35);
+  color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--fg);
+  --color-sidebar: var(--sidebar);
   --color-surface: var(--surface);
   --color-panel: var(--panel);
   --color-panel-hover: var(--panel-hover);
+  --color-selected: var(--selected);
   --color-border: var(--border);
+  --color-input: var(--input);
   --color-muted: var(--muted);
   --color-subtle: var(--subtle);
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
   --color-accent-soft: var(--accent-soft);
   --color-on-accent: var(--on-accent);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -68,18 +56,90 @@
 body {
   background: var(--bg);
   color: var(--fg);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 @layer base {
+  * {
+    border-color: var(--border);
+    scrollbar-color: var(--border) transparent;
+    scrollbar-width: thin;
+  }
+
   input,
   textarea,
   select {
     color: var(--fg);
-    background-color: var(--surface);
+    background-color: var(--input);
   }
+
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    border-color: var(--accent);
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 3px var(--ring);
+  }
+
+  button,
+  a {
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease,
+      opacity 150ms ease;
+  }
+
   ::placeholder {
     color: var(--subtle);
     opacity: 1;
+  }
+
+  ::selection {
+    background: var(--selected);
+    color: var(--fg);
+  }
+}
+
+/* Paper output: report cards and Form 137/138 always print on white. */
+@media print {
+  :root {
+    --bg: #ffffff;
+    --fg: #111111;
+    --sidebar: #ffffff;
+    --surface: #ffffff;
+    --panel: #ffffff;
+    --panel-hover: #ffffff;
+    --selected: #ffffff;
+    --border: #b9beb9;
+    --input: #ffffff;
+    --muted: #333333;
+    --subtle: #555555;
+    --accent: #111111;
+    --accent-strong: #111111;
+    --accent-soft: #ffffff;
+    --on-accent: #ffffff;
+    --success: #111111;
+    --warning: #111111;
+    --danger: #111111;
+    --info: #111111;
+    color-scheme: light;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
   }
 }

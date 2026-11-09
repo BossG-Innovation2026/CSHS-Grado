@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -17,18 +17,19 @@ export const metadata: Metadata = {
   description: "Project Grado — grade level, track, and subject management",
 };
 
+export const viewport: Viewport = {
+  colorScheme: "dark",
+  themeColor: "#0C0F0D",
+};
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      style={{ colorScheme: "dark" }}
     >
       <body className="min-h-full flex flex-col">
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem("theme");if(t==="light"){document.documentElement.dataset.theme="light";}else if(t==="dark"){document.documentElement.dataset.theme="dark";}}catch(e){}`,
-          }}
-        />
         {children}
       </body>
     </html>

@@ -14,40 +14,48 @@
       "label": "School Head",
       "name": "Demo School Head",
       "email": "schoolhead@demo.grado",
-      "permissions": ["classes", "curriculum", "grades_approve"],
-      "summary": "School-wide overview and grade approval"
+      "permissions": ["classes", "curriculum", "grades_approve", "personal_info", "academic_info"],
+      "summary": "School-wide overview, grade verification and records"
     },
     {
       "role": "department_head",
       "label": "Department Head",
       "name": "Demo Department Head",
       "email": "depthead@demo.grado",
-      "permissions": ["classes", "grades_approve"],
-      "summary": "Assigned classes and grade approval"
+      "permissions": ["classes", "grades_approve", "personal_info"],
+      "summary": "Assigned classes and grade verification"
     },
     {
       "role": "registrar",
       "label": "Registrar",
       "name": "Demo Registrar",
       "email": "registrar@demo.grado",
-      "permissions": ["classes", "registrar"],
-      "summary": "Student records and forms (SF9/SF10)"
+      "permissions": ["classes", "registrar", "personal_info", "academic_info", "audit", "grades_approve"],
+      "summary": "Approves grades, receives records, prints cards and Form 137"
     },
     {
       "role": "teacher",
       "label": "Teacher (Class Adviser)",
       "name": "Demo Class Adviser",
       "email": "adviser@demo.grado",
-      "permissions": ["classes", "grades_submit", "codes"],
-      "summary": "Adviser of Grade 11 - A; also teaches subjects"
+      "permissions": ["classes", "grades_submit", "grades_approve", "personal_info"],
+      "summary": "Adviser of Grade 11 - A; encodes and verifies its grades"
     },
     {
       "role": "teacher",
       "label": "Teacher (Subject Teacher)",
       "name": "Demo Subject Teacher",
       "email": "teacher@demo.grado",
-      "permissions": ["classes", "grades_submit"],
+      "permissions": ["classes", "grades_submit", "personal_info"],
       "summary": "Teaches subjects in Grade 11 - A and Grade 12 - A"
+    },
+    {
+      "role": "parent",
+      "label": "Parent / Guardian",
+      "name": "Demo Parent",
+      "email": "parent@demo.grado",
+      "permissions": ["parent_portal"],
+      "summary": "Sees only the approved report card of the linked child"
     }
   ],
   "extraTeachers": [
@@ -57,5 +65,5 @@
       "summary": "Adviser of Grade 12 - A (no one-click button)"
     }
   ],
-  "studentParent": "Students and parents view grades with a voucher code from the class adviser (coming with the grades module)."
+  "studentParent": "Use the Parent / Guardian demo login. It is linked to one fake student and can only open that child's approved card."
 }
