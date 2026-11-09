@@ -70,6 +70,28 @@ export function CreateClassForm({ data }: { data: CreateClassData }) {
             className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-subtle focus:border-accent focus:outline-none"
           />
         </div>
+        <div>
+          <label htmlFor="strand" className="mb-1 block text-sm font-medium text-foreground">
+            Strand / track
+          </label>
+          <input
+            id="strand"
+            name="strand"
+            placeholder="e.g. ICT, HUMSS, STEM"
+            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-subtle focus:border-accent focus:outline-none"
+          />
+        </div>
+        <div>
+          <label htmlFor="schoolYear" className="mb-1 block text-sm font-medium text-foreground">
+            School year
+          </label>
+          <input
+            id="schoolYear"
+            name="schoolYear"
+            placeholder="e.g. 2026-2027"
+            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-subtle focus:border-accent focus:outline-none"
+          />
+        </div>
       </div>
 
       {state.needsConfirm && (

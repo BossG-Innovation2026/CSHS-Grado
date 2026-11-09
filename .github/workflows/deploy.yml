@@ -86,6 +86,14 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      # Keep the demo in step with the deployed schema: four sections, three
+      # terms, component grades. Demo data is fake, so resetting is safe.
+      - name: Seed demo fake data
+        if: steps.demo.outputs.enabled == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_DEMO }}
+        run: node scripts/seed-demo.mjs --reset
+
       - name: Demo auth secret (set once)
         if: steps.demo.outputs.enabled == 'true'
         env:

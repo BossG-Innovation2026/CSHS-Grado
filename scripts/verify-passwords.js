@@ -37,7 +37,7 @@ const CLASS_ID = "22222222-3333-4444-5555-666666666666";
   await page.goto(BASE + "/login");
   await page.locator("#email").fill(EMAIL);
   await page.locator("#password").fill(PASSWORD);
-  await page.getByRole("button", { name: /sign in/i }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL("**/dashboard", { timeout: 15000 }).catch(() => {});
 
   await page.goto(BASE + "/classes/" + CLASS_ID);

@@ -18,7 +18,8 @@ export function SignOutButton({ className, compact = false }: { className?: stri
       <button
         onClick={handleSignOut}
         title="Sign out"
-        className="flex h-9 w-9 items-center justify-center rounded-md bg-panel-hover text-foreground hover:bg-accent hover:text-on-accent"
+        aria-label="Sign out"
+        className="flex h-9 w-9 items-center justify-center rounded-full bg-panel-hover text-foreground hover:bg-accent hover:text-on-accent"
       >
         <LogOut size={16} />
       </button>

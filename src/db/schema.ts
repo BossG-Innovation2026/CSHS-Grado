@@ -170,6 +170,10 @@ export const schoolClass = pgTable(
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
+    /** Track/strand offered by the section, e.g. "ICT" or "HUMSS". */
+    strand: text("strand").notNull().default(""),
+    /** School year the section belongs to, e.g. "2026-2027". */
+    schoolYear: text("school_year").notNull().default(""),
     gradeLevelId: text("grade_level_id")
       .notNull()
       .references(() => gradeLevel.id, { onDelete: "cascade" }),
@@ -202,6 +206,14 @@ export const classSubject = pgTable(
     description: text("description").notNull().default(""),
     teacherId: text("teacher_id").references(() => user.id, { onDelete: "set null" }),
     term: smallint("term").notNull().default(1),
+    /**
+     * Weight of each assessment component in the final grade, in percent.
+     * DepEd weights differ per subject group (e.g. 30/50/20 or 40/40/20),
+     * so they are stored per offering and must total 100.
+     */
+    wwWeight: smallint("ww_weight").notNull().default(30),
+    ptWeight: smallint("pt_weight").notNull().default(50),
+    otherWeight: smallint("other_weight").notNull().default(20),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
   (t) => [
@@ -211,7 +223,11 @@ export const classSubject = pgTable(
   ]
 );
 
-/** Students are not auth accounts: they have an LRN and basic info. */
+/**
+ * Students are not auth accounts: they have an LRN and personal information.
+ * `birthDate` is an ISO date string (YYYY-MM-DD) so it prints and sorts the
+ * same everywhere, without timezone surprises.
+ */
 export const student = pgTable(
   "student",
   {
@@ -221,6 +237,10 @@ export const student = pgTable(
     firstname: text("firstname").notNull(),
     middlename: text("middlename").notNull().default(""),
     sex: text("sex").notNull().default("M"),
+    birthDate: text("birth_date").notNull().default(""),
+    parentName: text("parent_name").notNull().default(""),
+    parentContact: text("parent_contact").notNull().default(""),
+    address: text("address").notNull().default(""),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
   (t) => [index("student_name_idx").on(sql`lower(${t.surname})`, sql`lower(${t.firstname})`)]
@@ -241,6 +261,193 @@ export const enrollment = pgTable(
   (t) => [
     uniqueIndex("enrollment_class_student_uq").on(t.classId, t.studentId),
     index("enrollment_student_idx").on(t.studentId),
+  ]
+);
+
+/* ------------------------------------------------------------------ */
+/* Parent portal                                                       */
+/* ------------------------------------------------------------------ */
+
+/** Links a parent/guardian login to the student(s) they may view. */
+export const parentLink = pgTable(
+  "parent_link",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => student.id, { onDelete: "cascade" }),
+    relationship: text("relationship").notNull().default("Parent"),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("parent_link_user_student_uq").on(t.userId, t.studentId),
+    index("parent_link_student_idx").on(t.studentId),
+  ]
+);
+
+/* ------------------------------------------------------------------ */
+/* Grades, verification and signed sheets                              */
+/* ------------------------------------------------------------------ */
+
+/** One grade per student, per subject offering (class_subject is per term). */
+export const grade = pgTable(
+  "grade",
+  {
+    id: text("id").primaryKey(),
+    classSubjectId: text("class_subject_id")
+      .notNull()
+      .references(() => classSubject.id, { onDelete: "cascade" }),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => student.id, { onDelete: "cascade" }),
+    /** DepEd scale 60–100; NULL means "not yet encoded". */
+    value: integer("value"),
+    /**
+     * Assessment components, each a percentage (0–100). When all three are
+     * present the final `value` is derived from them using the offering's
+     * weights; they are optional so a single final grade can still be encoded.
+     */
+    writtenWork: integer("written_work"),
+    performanceTask: integer("performance_task"),
+    otherAssessment: integer("other_assessment"),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("grade_class_subject_student_uq").on(t.classSubjectId, t.studentId),
+    index("grade_student_idx").on(t.studentId),
+  ]
+);
+
+/**
+ * Workflow for one class_subject (one subject, one term):
+ * draft → submitted (subject teacher) → verified (adviser) →
+ * approved (registrar) ; or returned with a note at any step.
+ */
+export const gradeSubmission = pgTable(
+  "grade_submission",
+  {
+    id: text("id").primaryKey(),
+    classSubjectId: text("class_subject_id")
+      .notNull()
+      .references(() => classSubject.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("draft"),
+    submittedBy: text("submitted_by").references(() => user.id, { onDelete: "set null" }),
+    submittedAt: timestamptz("submitted_at"),
+    adviserVerifiedBy: text("adviser_verified_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    adviserVerifiedAt: timestamptz("adviser_verified_at"),
+    registrarVerifiedBy: text("registrar_verified_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    registrarVerifiedAt: timestamptz("registrar_verified_at"),
+    approvedBy: text("approved_by").references(() => user.id, { onDelete: "set null" }),
+    approvedAt: timestamptz("approved_at"),
+    returnNote: text("return_note").notNull().default(""),
+    updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("grade_submission_class_subject_uq").on(t.classSubjectId)]
+);
+
+/**
+ * Proof that the registrar office holds the teacher's signed grading sheet.
+ * This is the paper backup used to double-check encoded grades.
+ */
+export const signedSheet = pgTable(
+  "signed_sheet",
+  {
+    id: text("id").primaryKey(),
+    classSubjectId: text("class_subject_id")
+      .notNull()
+      .references(() => classSubject.id, { onDelete: "cascade" }),
+    referenceNo: text("reference_no").notNull().default(""),
+    receivedBy: text("received_by").references(() => user.id, { onDelete: "set null" }),
+    receivedAt: timestamptz("received_at").notNull().defaultNow(),
+    note: text("note").notNull().default(""),
+  },
+  (t) => [index("signed_sheet_class_subject_idx").on(t.classSubjectId)]
+);
+
+/* ------------------------------------------------------------------ */
+/* Academic records (JHS / Form 137)                                   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A record from a previous school (junior high school, or a previous SHS).
+ * `subjects` is a JSON array of { subject, grade } so a full JHS card can be
+ * reproduced as the basis of the permanent record (Form 137).
+ */
+export const academicRecord = pgTable(
+  "academic_record",
+  {
+    id: text("id").primaryKey(),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => student.id, { onDelete: "cascade" }),
+    schoolName: text("school_name").notNull().default(""),
+    schoolYear: text("school_year").notNull().default(""),
+    gradeLevel: text("grade_level").notNull().default(""),
+    generalAverage: text("general_average").notNull().default(""),
+    honors: text("honors").notNull().default(""),
+    completed: boolean("completed").notNull().default(false),
+    subjects: text("subjects").notNull().default("[]"),
+    note: text("note").notNull().default(""),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("academic_record_student_idx").on(t.studentId)]
+);
+
+/**
+ * Hand-over of a student's permanent record from the adviser to the
+ * registrar (graduation, transfer or stop-out). The adviser surrenders;
+ * the registrar confirms receipt.
+ */
+export const recordSurrender = pgTable(
+  "record_surrender",
+  {
+    id: text("id").primaryKey(),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => student.id, { onDelete: "cascade" }),
+    classId: text("class_id").references(() => schoolClass.id, { onDelete: "set null" }),
+    reason: text("reason").notNull().default("graduated"),
+    status: text("status").notNull().default("pending"),
+    surrenderedBy: text("surrendered_by").references(() => user.id, { onDelete: "set null" }),
+    surrenderedAt: timestamptz("surrendered_at").notNull().defaultNow(),
+    receivedBy: text("received_by").references(() => user.id, { onDelete: "set null" }),
+    receivedAt: timestamptz("received_at"),
+    note: text("note").notNull().default(""),
+  },
+  (t) => [
+    index("record_surrender_student_idx").on(t.studentId),
+    index("record_surrender_status_idx").on(t.status),
+  ]
+);
+
+/* ------------------------------------------------------------------ */
+/* Audit log                                                           */
+/* ------------------------------------------------------------------ */
+
+/** Append-only trail of who changed what, for the registrar and admins. */
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: text("id").primaryKey(),
+    actorId: text("actor_id").references(() => user.id, { onDelete: "set null" }),
+    actorName: text("actor_name").notNull().default(""),
+    action: text("action").notNull(),
+    entity: text("entity").notNull().default(""),
+    entityId: text("entity_id").notNull().default(""),
+    detail: text("detail").notNull().default(""),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("audit_log_created_idx").on(t.createdAt),
+    index("audit_log_entity_idx").on(t.entity, t.entityId),
   ]
 );
 

@@ -64,16 +64,24 @@ export default async function ClassDetailPage({
         <div>
           <h1 className="text-xl font-bold text-foreground">{cls.name}</h1>
           <p className="mt-1 text-sm text-muted">
-            {cls.gradeLevelName} · Adviser: <span className="text-foreground">{cls.adviserName}</span>
+            {cls.gradeLevelName}
+            {cls.strand ? ` · ${cls.strand}` : ""}
+            {cls.schoolYear ? ` · SY ${cls.schoolYear}` : ""} · Adviser:{" "}
+            <span className="text-foreground">{cls.adviserName}</span>
           </p>
         </div>
         {canEdit && <DeleteClassDialog classId={cls.id} className={cls.name} />}
       </div>
 
       {canEdit && (
-        <div className="mt-6 max-w-md rounded-lg border border-border bg-surface p-4">
-          <h2 className="text-sm font-semibold text-foreground">Rename section</h2>
-          <RenameClassForm classId={cls.id} name={cls.name} />
+        <div className="mt-6 max-w-2xl rounded-lg border border-border bg-surface p-4">
+          <h2 className="text-sm font-semibold text-foreground">Section details</h2>
+          <RenameClassForm
+            classId={cls.id}
+            name={cls.name}
+            strand={cls.strand}
+            schoolYear={cls.schoolYear}
+          />
         </div>
       )}
 
@@ -109,6 +117,7 @@ export default async function ClassDetailPage({
               <th className="px-4 py-3">Code</th>
               <th className="px-4 py-3">Subject</th>
               <th className="px-4 py-3">Subject teacher</th>
+              <th className="px-4 py-3">Weights</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
@@ -133,6 +142,9 @@ export default async function ClassDetailPage({
                     <span className="text-sm text-foreground">{s.teacherName ?? "—"}</span>
                   )}
                 </td>
+                <td className="px-4 py-3 text-xs text-muted">
+                  WW {s.wwWeight}% · PT {s.ptWeight}% · Other {s.otherWeight}%
+                </td>
                 <td className="px-4 py-3 text-right">
                   {canEdit && <RemoveClassSubjectButton id={s.id} />}
                 </td>
@@ -140,7 +152,7 @@ export default async function ClassDetailPage({
             ))}
             {subjects.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-subtle">
+                <td colSpan={5} className="px-4 py-8 text-center text-subtle">
                   No subjects set up for Term {term} yet.
                 </td>
               </tr>

@@ -74,7 +74,7 @@ export function Sidebar({
 
   return (
     <aside
-      className={`relative flex flex-col bg-panel text-foreground transition-all ${
+      className={`relative flex flex-col bg-sidebar text-foreground transition-all ${
         collapsed ? "w-14" : "w-60"
       }`}
     >

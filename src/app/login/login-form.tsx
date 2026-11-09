@@ -58,13 +58,13 @@ export function LoginForm({
   return (
     <main className="flex flex-1 items-center justify-center bg-background p-6">
       <div className="w-full max-w-sm">
-        <div className="rounded-xl border border-border bg-surface p-8 shadow-xl">
+        <div className="rounded-lg border border-border bg-surface p-8">
           <div className="text-center">
-            <span className="inline-block rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold uppercase tracking-wide text-accent-strong">
+            <span className="inline-block rounded-md border border-border bg-selected px-3 py-1 text-xs font-semibold uppercase tracking-wide text-accent">
               {demoLogins.length > 0 ? "Demo — fake data" : "Project Grado"}
             </span>
             <h1 className="mt-3 text-xl font-bold text-foreground">Project Grado</h1>
-            <p className="mt-1 text-sm text-muted">Sign in to your account</p>
+          <p className="mt-1 text-sm text-muted">Sign in to your account</p>
           </div>
           <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
             <Suspense fallback={null}>
@@ -115,12 +115,12 @@ export function LoginForm({
         </div>
 
         {demoLogins.length > 0 && (
-          <section aria-labelledby="demo-heading" className="mt-4 rounded-xl border border-border bg-surface p-5 shadow-sm">
+          <section aria-labelledby="demo-heading" className="mt-4 rounded-lg border border-border bg-surface p-5">
             <h2 id="demo-heading" className="text-sm font-semibold text-foreground">
               Try a demo account
             </h2>
             <p className="mt-1 text-xs text-muted">
-              Everything on this demo site is fake. Password for all: <code>{demoLogins[0].password}</code>
+              Everything on this demo site is fake. Password for all: <code className="rounded bg-input px-1 py-0.5 text-foreground">{demoLogins[0].password}</code>
             </p>
             <ul className="mt-3 space-y-2">
               {demoLogins.map((d) => (
@@ -129,7 +129,7 @@ export function LoginForm({
                     type="button"
                     disabled={loading !== null}
                     onClick={() => void signIn(d.email, d.password, d.email)}
-                    className="flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-left hover:bg-panel-hover disabled:opacity-50"
+                    className="flex w-full items-center justify-between rounded-md border border-border bg-panel px-3 py-2 text-left transition-colors hover:border-accent/50 hover:bg-panel-hover disabled:opacity-50"
                   >
                     <span>
                       <span className="block text-sm font-medium text-foreground">

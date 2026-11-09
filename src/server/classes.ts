@@ -10,6 +10,8 @@ const { schoolClass, classSubject, gradeLevel, subject, user, student, enrollmen
 export interface ClassRow {
   id: string;
   name: string;
+  strand: string;
+  schoolYear: string;
   gradeLevelId: string;
   gradeLevelName: string;
   adviserId: string;
@@ -26,6 +28,9 @@ export interface ClassSubjectRow {
   teacherId: string | null;
   teacherName: string | null;
   term: number;
+  wwWeight: number;
+  ptWeight: number;
+  otherWeight: number;
 }
 
 export interface StudentRow {
@@ -40,6 +45,8 @@ export interface StudentRow {
 const classColumns = {
   id: schoolClass.id,
   name: schoolClass.name,
+  strand: schoolClass.strand,
+  schoolYear: schoolClass.schoolYear,
   gradeLevelId: schoolClass.gradeLevelId,
   gradeLevelName: gradeLevel.name,
   adviserId: schoolClass.adviserId,
@@ -76,6 +83,9 @@ export async function listClassSubjects(classId: string, term: number): Promise<
       teacherId: classSubject.teacherId,
       teacherName: user.name,
       term: classSubject.term,
+      wwWeight: classSubject.wwWeight,
+      ptWeight: classSubject.ptWeight,
+      otherWeight: classSubject.otherWeight,
     })
     .from(classSubject)
     .leftJoin(user, eq(user.id, classSubject.teacherId))

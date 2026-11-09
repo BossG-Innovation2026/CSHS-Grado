@@ -1,85 +1,151 @@
 @import "tailwindcss";
 
-:root,
-:root[data-theme="light"] {
-  --bg: #eef1f3;
-  --fg: #123a46;
-  --surface: #f8fafb;
-  --panel: #dde4e8;
-  --panel-hover: #cfdade;
-  --border: #c9d2d6;
-  --muted: #5b6f77;
-  --subtle: #7d9099;
-  --accent: #0aa5c3;
-  --accent-strong: #078aa8;
-  --accent-soft: #d9f1f6;
-  --on-accent: #ffffff;
-}
-
-:root[data-theme="dark"] {
-  --bg: #0d1518;
-  --fg: #e8f1f4;
-  --surface: #152126;
-  --panel: #101b1f;
-  --panel-hover: #1b2a30;
-  --border: #24353b;
-  --muted: #94a8b0;
-  --subtle: #6e828a;
-  --accent: #1fb8d8;
-  --accent-strong: #39c9e6;
-  --accent-soft: #16303a;
-  --on-accent: #052a33;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0d1518;
-    --fg: #e8f1f4;
-    --surface: #152126;
-    --panel: #101b1f;
-    --panel-hover: #1b2a30;
-    --border: #24353b;
-    --muted: #94a8b0;
-    --subtle: #6e828a;
-    --accent: #1fb8d8;
-    --accent-strong: #39c9e6;
-    --accent-soft: #16303a;
-    --on-accent: #052a33;
-  }
+/*
+ * Project Grado — dark academic design system (Cabiao SHS).
+ *
+ * One palette only: deep blue-black surfaces with a cyan accent. The previous
+ * emerald-on-cream theme is gone, so there is no theme switcher.
+ * Print views override these tokens back to paper colours (see bottom).
+ */
+:root {
+  --bg: #0d171a;
+  --fg: #e7f0f2;
+  --sidebar: #101d21;
+  --surface: #162429;
+  --panel: #1b2c32;
+  --panel-hover: #22363d;
+  --selected: #1f3d46;
+  --border: #26383e;
+  --input: #101d21;
+  --muted: #91a8b0;
+  --subtle: #6f8a92;
+  --accent: #20b7d3;
+  --accent-strong: #13c9e8;
+  --accent-soft: #12313a;
+  --on-accent: #05171c;
+  --success: #3ddc97;
+  --warning: #f2c14e;
+  --danger: #f27c86;
+  --info: #5cc8e8;
+  --ring: rgb(32 183 211 / 0.35);
+  color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--fg);
+  --color-sidebar: var(--sidebar);
   --color-surface: var(--surface);
   --color-panel: var(--panel);
   --color-panel-hover: var(--panel-hover);
+  --color-selected: var(--selected);
   --color-border: var(--border);
+  --color-input: var(--input);
   --color-muted: var(--muted);
   --color-subtle: var(--subtle);
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
   --color-accent-soft: var(--accent-soft);
   --color-on-accent: var(--on-accent);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
-  background: var(--bg);
+  background:
+    radial-gradient(1100px 520px at 85% -10%, rgb(32 183 211 / 0.09), transparent 60%),
+    radial-gradient(900px 460px at -10% 110%, rgb(19 201 232 / 0.06), transparent 60%),
+    var(--bg);
   color: var(--fg);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 @layer base {
+  * {
+    border-color: var(--border);
+    scrollbar-color: var(--border) transparent;
+    scrollbar-width: thin;
+  }
+
   input,
   textarea,
   select {
     color: var(--fg);
-    background-color: var(--surface);
+    background-color: var(--input);
   }
+
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    border-color: var(--accent);
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 3px var(--ring);
+  }
+
+  button,
+  a {
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease,
+      opacity 150ms ease,
+      transform 150ms ease;
+  }
+
   ::placeholder {
     color: var(--subtle);
     opacity: 1;
+  }
+
+  ::selection {
+    background: var(--selected);
+    color: var(--fg);
+  }
+}
+
+/* Paper output: report cards and Form 137/138 always print on white. */
+@media print {
+  :root {
+    --bg: #ffffff;
+    --fg: #111111;
+    --sidebar: #ffffff;
+    --surface: #ffffff;
+    --panel: #ffffff;
+    --panel-hover: #ffffff;
+    --selected: #ffffff;
+    --border: #b9beb9;
+    --input: #ffffff;
+    --muted: #333333;
+    --subtle: #555555;
+    --accent: #111111;
+    --accent-strong: #111111;
+    --accent-soft: #ffffff;
+    --on-accent: #ffffff;
+    --success: #111111;
+    --warning: #111111;
+    --danger: #111111;
+    --info: #111111;
+    color-scheme: light;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
   }
 }
